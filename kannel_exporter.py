@@ -7,6 +7,7 @@ import argparse
 import time
 import os
 from urllib.request import urlopen
+from urllib.error import URLError
 from re import findall
 from collections import OrderedDict
 from prometheus_client import start_http_server
@@ -32,7 +33,12 @@ class KannelCollector:
 
     def collect(self):
         url = self._target + "/status.xml?password=" + self._password
-        response = xmltodict.parse(urlopen(url))
+        print(url)
+        try:
+            response = xmltodict.parse(urlopen(url))
+        except URLError as e:
+            #print(e.reason)
+            return []
 
         # Version info
         version = findall('svn-[a-z0-9]*', response['gateway']['version'])[0]
@@ -205,18 +211,19 @@ class KannelCollector:
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description="Kannel exporter for Prometheus",
-        epilog="")
-    parser.add_argument('--target', dest='target', help='Target host:port to scrape. \
-        Defaults to enviroment variable KANNEL_HOST or to http://127.0.0.1:13000',
+    parser = argparse.ArgumentParser(description="Kannel exporter for Prometheus")
+    parser.add_argument('--target', dest='target',
+        help='Target host:port to scrape. Defaults to enviroment variable KANNEL_HOST \
+        or to http://127.0.0.1:13000',
         default=os.environ.get('KANNEL_HOST', 'http://127.0.0.1:13000'))
-    parser.add_argument('--password', dest='password', help='Target status page password. \
-        Defaults to enviroment variable KANNEL_STATUS_PASSWORD',
+    parser.add_argument('--password', dest='password', required=True,
+        help='Target status page password. Defaults to enviroment variable KANNEL_STATUS_PASSWORD',
         default=os.environ.get('KANNEL_STATUS_PASSWORD'))
-    parser.add_argument('--port', dest='port', type=int, help='Exporter port. \
-        Defaults to enviroment variable KANNEL_EXPORTER_PORT or 1234',
+    parser.add_argument('--port', dest='port', type=int,
+        help='Exporter port. Defaults to enviroment variable KANNEL_EXPORTER_PORT or 1234',
         default=int(os.environ.get('KANNEL_EXPORTER_PORT', '1234')))
-    parser.add_argument('--filter-smscs', dest='filter_smsc', action='store_true', help='Filter out SMSC metrics')
+    parser.add_argument('--filter-smscs', dest='filter_smsc', action='store_true',
+        help='Filter out SMSC metrics')
     args = parser.parse_args()
 
     start_http_server(args.port)
