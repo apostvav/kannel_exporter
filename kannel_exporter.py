@@ -33,12 +33,20 @@ class KannelCollector:
 
     def collect(self):
         url = self._target + "/status.xml?password=" + self._password
-        print(url)
+
+        # bearerbox server status
+        metric = GaugeMetricFamily('bearerbox_up', 'Could the bearerbox server be reached')
+
         try:
             response = xmltodict.parse(urlopen(url))
         except URLError as e:
-            #print(e.reason)
+            # print(e.reason)
+            metric.add_sample('bearerbox_up', value=0, labels={})
+            yield metric
             return []
+
+        metric.add_sample('bearerbox_up', value=1, labels={})
+        yield metric
 
         # Version info
         version = findall('svn-[a-z0-9]*', response['gateway']['version'])[0]
@@ -153,53 +161,47 @@ class KannelCollector:
 
         if self._filter_smsc is False:
             metric_failed = CounterMetricFamily('bearerbox_smsc_failed_messages_total',
-                'Total number of SMSC failed messages')
+                'Total number of SMSC failed messages', labels=["smsc-id"])
             metric_queued = GaugeMetricFamily('bearerbox_smsc_queued_messages',
-                'Number of SMSC queued messages')
+                'Number of SMSC queued messages', labels=["smsc-id"])
             metric_sms_received = CounterMetricFamily('bearerbox_smsc_received_sms_total',
-                'Total number of received SMS by SMSC')
+                'Total number of received SMS by SMSC', labels=["smsc-id"])
             metric_sms_sent = CounterMetricFamily('bearerbox_smsc_sent_sms_total',
-                'Total number of SMS sent to SMSC')
+                'Total number of SMS sent to SMSC', labels=["smsc-id"])
             metric_dlr_received = CounterMetricFamily('bearerbox_smsc_received_dlr_total',
-                'Total number of DLRs received by SMSC')
+                'Total number of DLRs received by SMSC', labels=["smsc-id"])
             metric_dlr_sent = CounterMetricFamily('bearerbox_smsc_sent_dlr_total',
-                'Total number of DLRs sent to SMSC')
+                'Total number of DLRs sent to SMSC', labels=["smsc-id"])
 
             # Group SMSCs by smsc-id
             smsc_stats_by_id = OrderedDict()
             for smsc in response['gateway']['smscs']['smsc']:
-                if smsc['id'] in smsc_stats_by_id:
-                    smsc_stats_by_id[smsc['id']]['failed'] += int(smsc['failed'])
-                    smsc_stats_by_id[smsc['id']]['queued'] += int(smsc['queued'])
-                    smsc_stats_by_id[smsc['id']]['sms']['received'] += int(smsc['sms']['received'])
-                    smsc_stats_by_id[smsc['id']]['sms']['sent'] += int(smsc['sms']['sent'])
-                    smsc_stats_by_id[smsc['id']]['dlr']['received'] += int(smsc['dlr']['received'])
-                    smsc_stats_by_id[smsc['id']]['dlr']['sent'] += int(smsc['dlr']['sent'])
+                smscid = smsc['id']
+                if smscid in smsc_stats_by_id:
+                    smsc_stats_by_id[smscid]['failed'] += int(smsc['failed'])
+                    smsc_stats_by_id[smscid]['queued'] += int(smsc['queued'])
+                    smsc_stats_by_id[smscid]['sms']['received'] += int(smsc['sms']['received'])
+                    smsc_stats_by_id[smscid]['sms']['sent'] += int(smsc['sms']['sent'])
+                    smsc_stats_by_id[smscid]['dlr']['received'] += int(smsc['dlr']['received'])
+                    smsc_stats_by_id[smscid]['dlr']['sent'] += int(smsc['dlr']['sent'])
                 else:
-                    smsc_stats_by_id[smsc['id']] = OrderedDict()
-                    smsc_stats_by_id[smsc['id']]['failed'] = int(smsc['failed'])
-                    smsc_stats_by_id[smsc['id']]['queued'] = int(smsc['queued'])
-                    smsc_stats_by_id[smsc['id']]['sms'] = OrderedDict()
-                    smsc_stats_by_id[smsc['id']]['sms']['received'] = int(smsc['sms']['received'])
-                    smsc_stats_by_id[smsc['id']]['sms']['sent'] = int(smsc['sms']['sent'])
-                    smsc_stats_by_id[smsc['id']]['dlr'] = OrderedDict()
-                    smsc_stats_by_id[smsc['id']]['dlr']['received'] = int(smsc['dlr']['received'])
-                    smsc_stats_by_id[smsc['id']]['dlr']['sent'] = int(smsc['dlr']['sent'])
+                    smsc_stats_by_id[smscid] = OrderedDict()
+                    smsc_stats_by_id[smscid]['failed'] = int(smsc['failed'])
+                    smsc_stats_by_id[smscid]['queued'] = int(smsc['queued'])
+                    smsc_stats_by_id[smscid]['sms'] = OrderedDict()
+                    smsc_stats_by_id[smscid]['sms']['received'] = int(smsc['sms']['received'])
+                    smsc_stats_by_id[smscid]['sms']['sent'] = int(smsc['sms']['sent'])
+                    smsc_stats_by_id[smscid]['dlr'] = OrderedDict()
+                    smsc_stats_by_id[smscid]['dlr']['received'] = int(smsc['dlr']['received'])
+                    smsc_stats_by_id[smscid]['dlr']['sent'] = int(smsc['dlr']['sent'])
 
             for smsc in smsc_stats_by_id:
-                smsc_labels = {'smsc-id': smsc}
-                metric_failed.add_sample('bearerbox_smsc_failed_messages_total',
-                    value=smsc_stats_by_id[smsc]['failed'], labels=smsc_labels)
-                metric_queued.add_sample('bearerbox_smsc_queued_messages',
-                    value=smsc_stats_by_id[smsc]['queued'], labels=smsc_labels)
-                metric_sms_received.add_sample('bearerbox_smsc_received_sms_total',
-                    value=smsc_stats_by_id[smsc]['sms']['received'], labels=smsc_labels)
-                metric_sms_sent.add_sample('bearerbox_smsc_sent_sms_total',
-                    value=smsc_stats_by_id[smsc]['sms']['sent'], labels=smsc_labels)
-                metric_dlr_received.add_sample('bearerbox_smsc_received_dlr_total',
-                    value=smsc_stats_by_id[smsc]['dlr']['received'], labels=smsc_labels)
-                metric_dlr_sent.add_sample('bearerbox_smsc_sent_dlr_total',
-                    value=smsc_stats_by_id[smsc]['dlr']['sent'], labels=smsc_labels)
+                metric_failed.add_metric([smsc], smsc_stats_by_id[smsc]['failed'])
+                metric_queued.add_metric([smsc], smsc_stats_by_id[smsc]['queued'])
+                metric_sms_received.add_metric([smsc], smsc_stats_by_id[smsc]['sms']['received'])
+                metric_sms_sent.add_metric([smsc], smsc_stats_by_id[smsc]['sms']['sent'])
+                metric_dlr_received.add_metric([smsc], smsc_stats_by_id[smsc]['dlr']['received'])
+                metric_dlr_sent.add_metric([smsc], smsc_stats_by_id[smsc]['dlr']['sent'])
 
             yield metric_failed
             yield metric_queued
