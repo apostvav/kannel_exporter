@@ -215,14 +215,13 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="Kannel exporter for Prometheus")
     parser.add_argument('--target', dest='target',
-        help='Target host:port to scrape. Defaults to enviroment variable KANNEL_HOST \
-        or to http://127.0.0.1:13000',
+        help='Target kannel server, PROTO:HOST:PORT. (default http://127.0.0.1:13000)',
         default=os.environ.get('KANNEL_HOST', 'http://127.0.0.1:13000'))
     parser.add_argument('--password', dest='password', required=True,
-        help='Target status page password. Defaults to enviroment variable KANNEL_STATUS_PASSWORD',
+        help='Password of the kannel status page. Mandatory argument',
         default=os.environ.get('KANNEL_STATUS_PASSWORD'))
     parser.add_argument('--port', dest='port', type=int,
-        help='Exporter port. Defaults to enviroment variable KANNEL_EXPORTER_PORT or 1234',
+        help='Exporter port. (default 1234)',
         default=int(os.environ.get('KANNEL_EXPORTER_PORT', '1234')))
     parser.add_argument('--filter-smscs', dest='filter_smsc', action='store_true',
         help='Filter out SMSC metrics')
