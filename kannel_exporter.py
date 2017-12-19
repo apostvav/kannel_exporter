@@ -3,9 +3,12 @@
 # Prometheus custom collector for Kannel gateway
 # https://github.com/apostvav/kannel_exporter
 
+__version__ = '0.0.1'
+
 import argparse
 import time
 import os
+from sys import exit
 from urllib.request import urlopen
 from urllib.error import URLError
 from re import findall
@@ -213,22 +216,51 @@ class KannelCollector:
 
 if __name__ == '__main__':
 
+    # command line arguments
     parser = argparse.ArgumentParser(description="Kannel exporter for Prometheus")
     parser.add_argument('--target', dest='target',
         help='Target kannel server, PROTO:HOST:PORT. (default http://127.0.0.1:13000)',
         default=os.environ.get('KANNEL_HOST', 'http://127.0.0.1:13000'))
-    parser.add_argument('--password', dest='password', required=True,
-        help='Password of the kannel status page. Mandatory argument',
-        default=os.environ.get('KANNEL_STATUS_PASSWORD'))
     parser.add_argument('--port', dest='port', type=int,
         help='Exporter port. (default 9390)',
         default=int(os.environ.get('KANNEL_EXPORTER_PORT', '9390')))
     parser.add_argument('--filter-smscs', dest='filter_smsc', action='store_true',
         help='Filter out SMSC metrics')
+    parser.add_argument('-v', '--version', dest='version', action='store_true',
+        help='Display version information and exit')
+
+    pass_group = parser.add_mutually_exclusive_group()
+    pass_group.add_argument('--password', dest='password',
+        help='Password of the kannel status page. Mandatory argument',
+        default=os.environ.get('KANNEL_STATUS_PASSWORD'))
+    pass_group.add_argument('--password-file', dest='password_file',
+        help='File contains the password the kannel status page.')
+
     args = parser.parse_args()
 
+    # display version and exit
+    if args.version is True:
+        print("Version is {0}".format(__version__))
+        exit()
+
+    # check if password has been set
+    if args.password is None and args.password_file is None:
+        parser.error('Option --password or --password-file must be set.')
+
+    # get status password
+    if args.password_file is not None:
+        if os.path.isfile(args.password_file):
+            try:
+                status_password = open(args.password_file).read().strip()
+            except:
+                exit("Error: Failed to open and read file {0}".format(args.password_file))
+        else:
+            exit("Error: File {0} doesn't exist.".format(args.password_file))
+    else:
+        status_password = args.password
+
     start_http_server(args.port)
-    REGISTRY.register(KannelCollector(args.target, args.password, args.filter_smsc))
+    REGISTRY.register(KannelCollector(args.target, status_password, args.filter_smsc))
 
     while True:
       time.sleep(1)
