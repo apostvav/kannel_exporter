@@ -58,9 +58,9 @@ class KannelCollector:
 
         # Counter for the bearerbox uptime, in seconds
         uptime = uptime_to_secs(response['gateway']['status'])
-        metric = CounterMetricFamily('bearerbox_uptime_seconds_total',
+        metric = GaugeMetricFamily('bearerbox_uptime_seconds',
             'Current uptime in seconds (*)')
-        metric.add_sample('bearerbox_uptime_seconds_total',
+        metric.add_sample('bearerbox_uptime_seconds',
             value=uptime, labels={})
         yield metric
 
@@ -95,7 +95,7 @@ class KannelCollector:
 
         metric = GaugeMetricFamily('bearerbox_sms_storesize',
             'Number of SMS in storesize')
-        metric.add_sample('bearerbox_sms_sent_queued',
+        metric.add_sample('bearerbox_sms_storesize',
             value=int(response['gateway']['sms']['storesize']),
             labels={})
         yield metric
@@ -221,8 +221,8 @@ if __name__ == '__main__':
         help='Password of the kannel status page. Mandatory argument',
         default=os.environ.get('KANNEL_STATUS_PASSWORD'))
     parser.add_argument('--port', dest='port', type=int,
-        help='Exporter port. (default 1234)',
-        default=int(os.environ.get('KANNEL_EXPORTER_PORT', '1234')))
+        help='Exporter port. (default 9390)',
+        default=int(os.environ.get('KANNEL_EXPORTER_PORT', '9390')))
     parser.add_argument('--filter-smscs', dest='filter_smsc', action='store_true',
         help='Filter out SMSC metrics')
     args = parser.parse_args()

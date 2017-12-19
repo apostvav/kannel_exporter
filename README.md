@@ -12,7 +12,7 @@ kannel_exporter.py [-h] [--target TARGET] --password PASSWORD [--port PORT] [--f
   -h, --help           show this help message and exit
   --target TARGET      Target kannel server, PROTO:HOST:PORT. (default http://127.0.0.1:13000)
   --password PASSWORD  Password of the kannel status page. Mandatory argument
-  --port PORT          Exporter port. (default 1234)
+  --port PORT          Exporter port. (default 9390)
   --filter-smscs       Filter out SMSC metrics
 ```
 
