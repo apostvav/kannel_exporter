@@ -56,7 +56,7 @@ class KannelCollector:
             value=1, labels={'version': version})
         yield metric
 
-        # Counter for the bearerbox uptime, in seconds
+        # Gauge for the bearerbox uptime, in seconds
         uptime = uptime_to_secs(response['gateway']['status'])
         metric = GaugeMetricFamily('bearerbox_uptime_seconds',
             'Current uptime in seconds (*)')
@@ -137,13 +137,13 @@ class KannelCollector:
             labels={})
         yield metric
 
-        metric_uptime = CounterMetricFamily('bearerbox_box_uptime_seconds_total',
+        metric_uptime = GaugeMetricFamily('bearerbox_box_uptime_seconds',
             'Box uptime in seconds (*)')
         metric_queue = GaugeMetricFamily('bearerbox_box_queue',
             'Number of messages in box queue')
         for box in response['gateway']['boxes']['box']:
             box_labels = {'type': box['type'], 'id': box['id'], 'ipaddr': box['IP']}
-            metric_uptime.add_sample('bearerbox_box_uptime_seconds_total',
+            metric_uptime.add_sample('bearerbox_box_uptime_seconds',
                 value=uptime_to_secs(box['status']), labels=box_labels)
             metric_queue.add_sample('bearerbox_box_queue',
                 value=int(box['queue']), labels=box_labels)
