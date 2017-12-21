@@ -8,7 +8,7 @@ __version__ = '0.0.1'
 import argparse
 import time
 import os
-from sys import exit
+import sys
 from urllib.request import urlopen
 from urllib.error import URLError
 from re import findall
@@ -42,8 +42,8 @@ class KannelCollector:
 
         try:
             response = xmltodict.parse(urlopen(url))
-        except URLError as e:
-            # print(e.reason)
+        except URLError as err:
+            # print(err.reason)
             metric.add_sample('bearerbox_up', value=0, labels={})
             yield metric
             return []
@@ -241,21 +241,20 @@ if __name__ == '__main__':
     # display version and exit
     if args.version is True:
         print("Version is {0}".format(__version__))
-        exit()
+        sys.exit()
 
     # check if password has been set
     if args.password is None and args.password_file is None:
         parser.error('Option --password or --password-file must be set.')
 
-    # get status password
+    # get password
     if args.password_file is not None:
-        if os.path.isfile(args.password_file):
-            try:
-                status_password = open(args.password_file).read().strip()
-            except:
-                exit("Error: Failed to open and read file {0}".format(args.password_file))
-        else:
-            exit("Error: File {0} doesn't exist.".format(args.password_file))
+        try:
+            status_password = open(args.password_file).read().strip()
+        except OSError as err:
+            sys.exit("Failed to open file {0}.\n{1}".format(args.password_file, err))
+        except UnicodeError as err:
+            sys.exit("Failed to read file {0}.\n{1}".format(args.password_file, err))
     else:
         status_password = args.password
 

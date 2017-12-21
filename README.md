@@ -29,7 +29,7 @@ Instead of command line arguments, values can be passed using environment variab
 ```
 
 ## Install
-Collector is written in Python3. Currently it is not compatible with Python2.
+Collector is written in Python3. It is not compatible with Python2.
 
 ```
 git clone https://github.com/apostvav/kannel_exporter.git
@@ -38,7 +38,7 @@ pip install -r requirements.txt
 ```
 
 ### Docker
-To run exporter using docker
+Run exporter using docker.
 ```
 docker pull apostvav/kannel_exporter
 docker run -d -p 9390:9390 apostvav/kannel_exporter --password-file=PASSWORD_FILE
