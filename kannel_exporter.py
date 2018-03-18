@@ -14,7 +14,8 @@ from urllib.error import URLError
 from re import findall
 from collections import OrderedDict
 from prometheus_client import start_http_server
-from prometheus_client.core import GaugeMetricFamily, CounterMetricFamily, REGISTRY
+from prometheus_client.core import GaugeMetricFamily, CounterMetricFamily
+from prometheus_client import REGISTRY
 import xmltodict
 
 
@@ -38,7 +39,8 @@ class KannelCollector:
         url = self._target + "/status.xml?password=" + self._password
 
         # bearerbox server status
-        metric = GaugeMetricFamily('bearerbox_up', 'Could the bearerbox server be reached')
+        metric = GaugeMetricFamily('bearerbox_up',
+                                   'Could the bearerbox server be reached')
 
         try:
             response = xmltodict.parse(urlopen(url))
@@ -54,127 +56,134 @@ class KannelCollector:
         # Version info
         version = findall('svn-[a-z0-9]*', response['gateway']['version'])[0]
         metric = GaugeMetricFamily('bearerbox_build_info',
-            'Kannel bearerbox version info')
-        metric.add_sample('bearerbox_build_info',
-            value=1, labels={'version': version})
+                                   'Kannel bearerbox version info')
+        metric.add_sample('bearerbox_build_info', value=1,
+                          labels={'version': version})
         yield metric
 
         # Gauge for the bearerbox uptime, in seconds
         uptime = uptime_to_secs(response['gateway']['status'])
         metric = GaugeMetricFamily('bearerbox_uptime_seconds',
-            'Current uptime in seconds (*)')
-        metric.add_sample('bearerbox_uptime_seconds',
-            value=uptime, labels={})
+                                   'Current uptime in seconds (*)')
+        metric.add_sample('bearerbox_uptime_seconds', value=uptime, labels={})
         yield metric
 
         # SMS metrics
         metric = CounterMetricFamily('bearerbox_sms_received_total',
-            'Total number of SMS received')
+                                     'Total number of SMS received')
         metric.add_sample('bearerbox_sms_received_total',
-            value=int(response['gateway']['sms']['received']['total']),
-            labels={})
+                          value=int(response['gateway']['sms']['received']['total']),
+                          labels={})
         yield metric
 
         metric = CounterMetricFamily('bearerbox_sms_sent_total',
-            'Total number of SMS sent')
+                                     'Total number of SMS sent')
         metric.add_sample('bearerbox_sms_sent_total',
-            value=int(response['gateway']['sms']['sent']['total']),
-            labels={})
+                          value=int(response['gateway']['sms']['sent']['total']),
+                          labels={})
         yield metric
 
         metric = GaugeMetricFamily('bearerbox_sms_received_queued',
-            'Number of received SMS in queue')
+                                   'Number of received SMS in queue')
         metric.add_sample('bearerbox_sms_received_queued',
-            value=int(response['gateway']['sms']['received']['queued']),
-            labels={})
+                          value=int(response['gateway']['sms']['received']['queued']),
+                          labels={})
         yield metric
 
         metric = GaugeMetricFamily('bearerbox_sms_sent_queued',
-            'Number of sent SMS in queue')
+                                   'Number of sent SMS in queue')
         metric.add_sample('bearerbox_sms_sent_queued',
-            value=int(response['gateway']['sms']['sent']['queued']),
-            labels={})
+                          value=int(response['gateway']['sms']['sent']['queued']),
+                          labels={})
         yield metric
 
         metric = GaugeMetricFamily('bearerbox_sms_storesize',
-            'Number of SMS in storesize')
+                                   'Number of SMS in storesize')
         metric.add_sample('bearerbox_sms_storesize',
-            value=int(response['gateway']['sms']['storesize']),
-            labels={})
+                          value=int(response['gateway']['sms']['storesize']),
+                          labels={})
         yield metric
 
         # DLRs
         metric = CounterMetricFamily('bearerbox_dlr_received_total',
-            'Total number of DLRs received')
+                                     'Total number of DLRs received')
         metric.add_sample('bearerbox_dlr_received_total',
-            value=int(response['gateway']['dlr']['received']['total']),
-            labels={})
+                          value=int(response['gateway']['dlr']['received']['total']),
+                          labels={})
         yield metric
 
         metric = CounterMetricFamily('bearerbox_dlr_sent_total',
-            'Total number of DLRs sent')
+                                     'Total number of DLRs sent')
         metric.add_sample('bearerbox_dlr_sent_total',
-            value=int(response['gateway']['dlr']['sent']['total']),
-            labels={})
+                          value=int(response['gateway']['dlr']['sent']['total']),
+                          labels={})
         yield metric
 
         metric = GaugeMetricFamily('bearerbox_dlr_queued',
-            'Number of DLRs in queue')
+                                   'Number of DLRs in queue')
         metric.add_sample('bearerbox_dlr_queued',
-            value=int(response['gateway']['dlr']['queued']),
-            labels={})
+                          value=int(response['gateway']['dlr']['queued']),
+                          labels={})
         yield metric
 
         metric = GaugeMetricFamily('bearerbox_dlr_storage',
-            'DLR storage type info')
-        metric.add_sample('bearerbox_dlr_storage',
-            value=1,
-            labels={'storage': response['gateway']['dlr']['storage']})
+                                   'DLR storage type info')
+        metric.add_sample('bearerbox_dlr_storage', value=1,
+                          labels={'storage': response['gateway']['dlr']['storage']})
         yield metric
 
         # Boxes metrics
         metric = GaugeMetricFamily('bearerbox_boxes_connected',
-            'Number of boxes connected on the gateway')
+                                   'Number of boxes connected on the gateway')
         metric.add_sample('bearerbox_boxes_connected',
-            value=len(response['gateway']['boxes']['box']),
-            labels={})
+                          value=len(response['gateway']['boxes']['box']),
+                          labels={})
         yield metric
 
         metric_uptime = GaugeMetricFamily('bearerbox_box_uptime_seconds',
-            'Box uptime in seconds (*)')
+                                          'Box uptime in seconds (*)')
         metric_queue = GaugeMetricFamily('bearerbox_box_queue',
-            'Number of messages in box queue')
+                                         'Number of messages in box queue')
         for box in response['gateway']['boxes']['box']:
-            box_labels = {'type': box['type'], 'id': box['id'], 'ipaddr': box['IP']}
+            box_labels = {'type':   box['type'],
+                          'id':     box['id'],
+                          'ipaddr': box['IP']}
             metric_uptime.add_sample('bearerbox_box_uptime_seconds',
-                value=uptime_to_secs(box['status']), labels=box_labels)
+                                     value=uptime_to_secs(box['status']),
+                                     labels=box_labels)
             metric_queue.add_sample('bearerbox_box_queue',
-                value=int(box['queue']), labels=box_labels)
+                                    value=int(box['queue']), labels=box_labels)
 
         yield metric_uptime
         yield metric_queue
 
         # SMSC metrics
         metric = GaugeMetricFamily('bearerbox_smsc_connections',
-            'Number of SMSC connections')
+                                   'Number of SMSC connections')
         metric.add_sample('bearerbox_smsc_connections',
-            value=int(response['gateway']['smscs']['count']),
-            labels={})
+                          value=int(response['gateway']['smscs']['count']),
+                          labels={})
         yield metric
 
         if self._filter_smsc is False:
             metric_failed = CounterMetricFamily('bearerbox_smsc_failed_messages_total',
-                'Total number of SMSC failed messages', labels=["smsc-id"])
+                                                'Total number of SMSC failed messages',
+                                                labels=["smsc-id"])
             metric_queued = GaugeMetricFamily('bearerbox_smsc_queued_messages',
-                'Number of SMSC queued messages', labels=["smsc-id"])
+                                              'Number of SMSC queued messages',
+                                              labels=["smsc-id"])
             metric_sms_received = CounterMetricFamily('bearerbox_smsc_received_sms_total',
-                'Total number of received SMS by SMSC', labels=["smsc-id"])
+                                                      'Total number of received SMS by SMSC',
+                                                      labels=["smsc-id"])
             metric_sms_sent = CounterMetricFamily('bearerbox_smsc_sent_sms_total',
-                'Total number of SMS sent to SMSC', labels=["smsc-id"])
+                                                  'Total number of SMS sent to SMSC',
+                                                  labels=["smsc-id"])
             metric_dlr_received = CounterMetricFamily('bearerbox_smsc_received_dlr_total',
-                'Total number of DLRs received by SMSC', labels=["smsc-id"])
+                                                      'Total number of DLRs received by SMSC',
+                                                      labels=["smsc-id"])
             metric_dlr_sent = CounterMetricFamily('bearerbox_smsc_sent_dlr_total',
-                'Total number of DLRs sent to SMSC', labels=["smsc-id"])
+                                                  'Total number of DLRs sent to SMSC',
+                                                  labels=["smsc-id"])
 
             # Group SMSCs by smsc-id
             smsc_stats_by_id = OrderedDict()
@@ -219,22 +228,22 @@ if __name__ == '__main__':
     # command line arguments
     parser = argparse.ArgumentParser(description="Kannel exporter for Prometheus")
     parser.add_argument('--target', dest='target',
-        help='Target kannel server, PROTO:HOST:PORT. (default http://127.0.0.1:13000)',
-        default=os.environ.get('KANNEL_HOST', 'http://127.0.0.1:13000'))
+                        help='Target kannel server, PROTO:HOST:PORT. (default http://127.0.0.1:13000)',
+                        default=os.environ.get('KANNEL_HOST', 'http://127.0.0.1:13000'))
     parser.add_argument('--port', dest='port', type=int,
-        help='Exporter port. (default 9390)',
-        default=int(os.environ.get('KANNEL_EXPORTER_PORT', '9390')))
+                        help='Exporter port. (default 9390)',
+                        default=int(os.environ.get('KANNEL_EXPORTER_PORT', '9390')))
     parser.add_argument('--filter-smscs', dest='filter_smsc', action='store_true',
-        help='Filter out SMSC metrics')
+                        help='Filter out SMSC metrics')
     parser.add_argument('-v', '--version', dest='version', action='store_true',
-        help='Display version information and exit')
+                        help='Display version information and exit')
 
     pass_group = parser.add_mutually_exclusive_group()
     pass_group.add_argument('--password', dest='password',
-        help='Password of the kannel status page. Mandatory argument',
-        default=os.environ.get('KANNEL_STATUS_PASSWORD'))
+                            help='Password of the kannel status page. Mandatory argument',
+                            default=os.environ.get('KANNEL_STATUS_PASSWORD'))
     pass_group.add_argument('--password-file', dest='password_file',
-        help='File contains the password the kannel status page.')
+                            help='File contains the password the kannel status page.')
 
     args = parser.parse_args()
 
@@ -252,14 +261,17 @@ if __name__ == '__main__':
         try:
             status_password = open(args.password_file).read().strip()
         except OSError as err:
-            sys.exit("Failed to open file {0}.\n{1}".format(args.password_file, err))
+            sys.exit("Failed to open file {0}.\n{1}".format(args.password_file,
+                                                            err))
         except UnicodeError as err:
-            sys.exit("Failed to read file {0}.\n{1}".format(args.password_file, err))
+            sys.exit("Failed to read file {0}.\n{1}".format(args.password_file,
+                                                            err))
     else:
         status_password = args.password
 
     start_http_server(args.port)
-    REGISTRY.register(KannelCollector(args.target, status_password, args.filter_smsc))
+    REGISTRY.register(KannelCollector(args.target, status_password,
+                                      args.filter_smsc))
 
     while True:
-      time.sleep(1)
+        time.sleep(1)
