@@ -35,17 +35,31 @@ class KannelCollector:
         self._password = password
         self._filter_smsc = filter_smsc
 
-    def collect(self):
+    def parse_kannel_status(self):
         url = self._target + "/status.xml?password=" + self._password
+        status = None
+        xml = None
 
+        try:
+            with urlopen(url) as request:
+                xml = request.read()
+            if xml is not None:
+                status = xmltodict.parse(xml)
+        except URLError as err:
+            print("Failed to open target URL")
+        except xmltodict.expat.ExpatError as err:
+            print("Failed to parse status XML")
+
+        return status
+
+    def collect(self):
         # bearerbox server status
         metric = GaugeMetricFamily('bearerbox_up',
                                    'Could the bearerbox server be reached')
 
-        try:
-            response = xmltodict.parse(urlopen(url))
-        except URLError as err:
-            # print(err.reason)
+        response = self.parse_kannel_status()
+
+        if response is None:
             metric.add_sample('bearerbox_up', value=0, labels={})
             yield metric
             return []
@@ -223,9 +237,7 @@ class KannelCollector:
             yield metric_dlr_sent
 
 
-if __name__ == '__main__':
-
-    # command line arguments
+def cli():
     parser = argparse.ArgumentParser(description="Kannel exporter for Prometheus")
     parser.add_argument('--target', dest='target',
                         help='Target kannel server, PROTO:HOST:PORT. (default http://127.0.0.1:13000)',
@@ -244,7 +256,13 @@ if __name__ == '__main__':
                             default=os.environ.get('KANNEL_STATUS_PASSWORD'))
     pass_group.add_argument('--password-file', dest='password_file',
                             help='File contains the password the kannel status page.')
+    return parser
 
+
+if __name__ == '__main__':
+
+    # command line arguments
+    parser = cli()
     args = parser.parse_args()
 
     # display version and exit
@@ -259,7 +277,8 @@ if __name__ == '__main__':
     # get password
     if args.password_file is not None:
         try:
-            status_password = open(args.password_file).read().strip()
+            with open(args.password_file) as fd:
+                status_password = fd.read().strip()
         except OSError as err:
             sys.exit("Failed to open file {0}.\n{1}".format(args.password_file,
                                                             err))
