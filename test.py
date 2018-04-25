@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import unittest
-from kannel_exporter import uptime_to_secs
+from kannel_exporter import KannelCollector, uptime_to_secs
 
 
 class KannelCollectorTestCase(unittest.TestCase):
@@ -13,6 +13,10 @@ class KannelCollectorTestCase(unittest.TestCase):
         self.assertEqual(uptime1, 4591)
         self.assertEqual(uptime2, 98)
         self.assertEqual(uptime3, 113)
+
+    def test_kannel_collector(self):
+        exporter = KannelCollector('', '', False)
+        self.assertEqual(exporter.parse_kannel_status(), None)
 
 
 if __name__ == "__main__":
