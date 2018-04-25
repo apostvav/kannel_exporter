@@ -45,8 +45,10 @@ class KannelCollector:
                 xml = request.read()
             if xml is not None:
                 status = xmltodict.parse(xml)
+        except ValueError as err:
+            print("Uknown URL type: {0}".format(url))
         except URLError as err:
-            print("Failed to open target URL")
+            print("Failed to open target URL: {0}".format(url))
         except xmltodict.expat.ExpatError as err:
             print("Failed to parse status XML")
 
