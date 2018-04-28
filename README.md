@@ -41,5 +41,5 @@ pip install -r requirements.txt
 Run exporter using docker.
 ```
 docker pull apostvav/kannel_exporter
-docker run -d -p 9390:9390 apostvav/kannel_exporter --password-file=PASSWORD_FILE
+docker run -d -p 9390:9390 apostvav/kannel_exporter
 ```
