@@ -28,6 +28,10 @@ def uptime_to_secs(uptime):
     uptime = days_in_secs + hours_in_secs + minutes_in_secs + secs
     return uptime
 
+def _xmlpostproc(path, key, value):
+    if value is None:
+        value = ""
+    return key, value
 
 class KannelCollector:
     def __init__(self, target, password, filter_smsc):
@@ -44,7 +48,7 @@ class KannelCollector:
             with urlopen(url) as request:
                 xml = request.read()
             if xml is not None:
-                status = xmltodict.parse(xml)
+                status = xmltodict.parse(xml, postprocessor=_xmlpostproc)
         except ValueError as err:
             print("Uknown URL type: {0}".format(url))
         except URLError as err:
@@ -184,22 +188,22 @@ class KannelCollector:
         if self._filter_smsc is False:
             metric_failed = CounterMetricFamily('bearerbox_smsc_failed_messages_total',
                                                 'Total number of SMSC failed messages',
-                                                labels=["smsc-id"])
+                                                labels=["smsc_id"])
             metric_queued = GaugeMetricFamily('bearerbox_smsc_queued_messages',
                                               'Number of SMSC queued messages',
-                                              labels=["smsc-id"])
+                                              labels=["smsc_id"])
             metric_sms_received = CounterMetricFamily('bearerbox_smsc_received_sms_total',
                                                       'Total number of received SMS by SMSC',
-                                                      labels=["smsc-id"])
+                                                      labels=["smsc_id"])
             metric_sms_sent = CounterMetricFamily('bearerbox_smsc_sent_sms_total',
                                                   'Total number of SMS sent to SMSC',
-                                                  labels=["smsc-id"])
+                                                  labels=["smsc_id"])
             metric_dlr_received = CounterMetricFamily('bearerbox_smsc_received_dlr_total',
                                                       'Total number of DLRs received by SMSC',
-                                                      labels=["smsc-id"])
+                                                      labels=["smsc_id"])
             metric_dlr_sent = CounterMetricFamily('bearerbox_smsc_sent_dlr_total',
                                                   'Total number of DLRs sent to SMSC',
-                                                  labels=["smsc-id"])
+                                                  labels=["smsc_id"])
 
             # Group SMSCs by smsc-id
             smsc_stats_by_id = OrderedDict()
