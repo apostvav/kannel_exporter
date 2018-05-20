@@ -28,10 +28,12 @@ def uptime_to_secs(uptime):
     uptime = days_in_secs + hours_in_secs + minutes_in_secs + secs
     return uptime
 
+
 def _xmlpostproc(path, key, value):
     if value is None:
         value = ""
     return key, value
+
 
 class KannelCollector:
     def __init__(self, target, password, filter_smsc):
