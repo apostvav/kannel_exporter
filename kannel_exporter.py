@@ -138,7 +138,7 @@ class KannelCollector:
                           labels={})
         yield metric
 
-        # DLRs
+        # DLR metrics
         metric = CounterMetricFamily('bearerbox_dlr_received_total',
                                      'Total number of DLRs received')
         metric.add_sample('bearerbox_dlr_received_total',
@@ -167,29 +167,30 @@ class KannelCollector:
         yield metric
 
         # Boxes metrics
-        metric = GaugeMetricFamily('bearerbox_boxes_connected',
-                                   'Number of boxes connected on the gateway')
-        metric.add_sample('bearerbox_boxes_connected',
-                          value=len(response['gateway']['boxes']['box']),
-                          labels={})
-        yield metric
+        if response['gateway']['boxes'] != '':
+            metric = GaugeMetricFamily('bearerbox_boxes_connected',
+                                       'Number of boxes connected on the gateway')
+            metric.add_sample('bearerbox_boxes_connected',
+                              value=len(response['gateway']['boxes']['box']),
+                              labels={})
+            yield metric
 
-        metric_uptime = GaugeMetricFamily('bearerbox_box_uptime_seconds',
-                                          'Box uptime in seconds (*)')
-        metric_queue = GaugeMetricFamily('bearerbox_box_queue',
-                                         'Number of messages in box queue')
-        for box in response['gateway']['boxes']['box']:
-            box_labels = {'type':   box['type'],
-                          'id':     box['id'],
-                          'ipaddr': box['IP']}
-            metric_uptime.add_sample('bearerbox_box_uptime_seconds',
-                                     value=uptime_to_secs(box['status']),
-                                     labels=box_labels)
-            metric_queue.add_sample('bearerbox_box_queue',
-                                    value=int(box['queue']), labels=box_labels)
+            metric_uptime = GaugeMetricFamily('bearerbox_box_uptime_seconds',
+                                              'Box uptime in seconds (*)')
+            metric_queue = GaugeMetricFamily('bearerbox_box_queue',
+                                             'Number of messages in box queue')
+            for box in response['gateway']['boxes']['box']:
+                box_labels = {'type':   box['type'],
+                              'id':     box['id'],
+                              'ipaddr': box['IP']}
+                metric_uptime.add_sample('bearerbox_box_uptime_seconds',
+                                         value=uptime_to_secs(box['status']),
+                                         labels=box_labels)
+                metric_queue.add_sample('bearerbox_box_queue',
+                                        value=int(box['queue']), labels=box_labels)
 
-        yield metric_uptime
-        yield metric_queue
+            yield metric_uptime
+            yield metric_queue
 
         # SMSC metrics
         metric = GaugeMetricFamily('bearerbox_smsc_connections',
