@@ -29,6 +29,18 @@ def uptime_to_secs(uptime):
     return uptime
 
 
+def bearerbox_version(version):
+    try:
+        version = version.split('\n')[0]
+    except IndexError:
+        return ""
+    # strip 'Kannel bearerbox version'
+    if version.find('Kannel bearerbox version ') == 0:
+        return version[25:].strip('`').rstrip('\'.')
+    else:
+        return ""
+
+
 def _xmlpostproc(path, key, value):
     if value is None:
         value = ""
@@ -76,7 +88,7 @@ class KannelCollector:
         yield metric
 
         # Version info
-        version = findall('svn-[a-z0-9]*', response['gateway']['version'])[0]
+        version = bearerbox_version(response['gateway']['version'])
         metric = GaugeMetricFamily('bearerbox_build_info',
                                    'Kannel bearerbox version info')
         metric.add_sample('bearerbox_build_info', value=1,
