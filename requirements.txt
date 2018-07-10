@@ -1,2 +1,2 @@
-prometheus-client==0.0.21
+prometheus-client==0.3.0
 xmltodict==0.11.0
