@@ -63,6 +63,11 @@ class KannelCollector:
                 xml = request.read()
             if xml is not None:
                 status = xmltodict.parse(xml, postprocessor=_xmlpostproc)
+
+            if status['gateway'] == 'Denied':
+                print("Authentication failed.")
+                return None
+
         except ValueError as err:
             print("Uknown URL type: {0}".format(url))
         except URLError as err:
@@ -166,19 +171,26 @@ class KannelCollector:
                           labels={'storage': response['gateway']['dlr']['storage']})
         yield metric
 
-        # Boxes metrics
+        # Box metrics
+        metric = GaugeMetricFamily('bearerbox_boxes_connected',
+                                   'Number of boxes connected on the gateway')
+
         if response['gateway']['boxes'] != '':
-            metric = GaugeMetricFamily('bearerbox_boxes_connected',
-                                       'Number of boxes connected on the gateway')
+            metric_uptime = GaugeMetricFamily('bearerbox_box_uptime_seconds',
+                                              'Box uptime in seconds (*)')
+            metric_queue = GaugeMetricFamily('bearerbox_box_queue',
+                                             'Number of messages in box queue')
+
+            # when there's only one box connected on the gateway
+            # xmltodict returns an OrderedDict instead of a list of OrderedDicts
+            if not isinstance(response['gateway']['boxes']['box'], list):
+                response['gateway']['boxes']['box'] = [response['gateway']['boxes']['box']]
+
             metric.add_sample('bearerbox_boxes_connected',
                               value=len(response['gateway']['boxes']['box']),
                               labels={})
             yield metric
 
-            metric_uptime = GaugeMetricFamily('bearerbox_box_uptime_seconds',
-                                              'Box uptime in seconds (*)')
-            metric_queue = GaugeMetricFamily('bearerbox_box_queue',
-                                             'Number of messages in box queue')
             for box in response['gateway']['boxes']['box']:
                 box_labels = {'type':   box['type'],
                               'id':     box['id'],
@@ -191,6 +203,10 @@ class KannelCollector:
 
             yield metric_uptime
             yield metric_queue
+
+        else:
+            metric.add_sample('bearerbox_boxes_connected', value=0, labels={})
+            yield metric
 
         # SMSC metrics
         metric = GaugeMetricFamily('bearerbox_smsc_connections',
@@ -222,6 +238,12 @@ class KannelCollector:
 
             # Group SMSCs by smsc-id
             smsc_stats_by_id = OrderedDict()
+
+            # when there's only one smsc connection on the gateway
+            # xmltodict returns an OrderedDict instead of a list of OrderedDicts
+            if not isinstance(response['gateway']['smscs']['smsc'], list):
+                response['gateway']['smscs']['smsc'] = [response['gateway']['smscs']['smsc']]
+
             for smsc in response['gateway']['smscs']['smsc']:
                 smscid = smsc['id']
                 if smscid in smsc_stats_by_id:
