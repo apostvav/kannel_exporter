@@ -3,7 +3,7 @@
 # Prometheus custom collector for Kannel gateway
 # https://github.com/apostvav/kannel_exporter
 
-__version__ = '0.1'
+__version__ = '0.1.1'
 
 import argparse
 import time
@@ -32,13 +32,14 @@ def uptime_to_secs(uptime):
 def bearerbox_version(version):
     try:
         version = version.split('\n')[0]
+        # strip 'Kannel bearerbox version ' (length 25)
+        if version.find('Kannel bearerbox version ') == 0:
+            version = version[25:].strip('`').rstrip('\'.')
+        else:
+            version = ""
     except IndexError:
-        return ""
-    # strip 'Kannel bearerbox version'
-    if version.find('Kannel bearerbox version ') == 0:
-        return version[25:].strip('`').rstrip('\'.')
-    else:
-        return ""
+        version = ""
+    return version
 
 
 def _xmlpostproc(path, key, value):

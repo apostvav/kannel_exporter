@@ -45,6 +45,7 @@ Using native malloc."""
         self.assertEqual(bearerbox_version(v1), "1.4.5")
         self.assertEqual(bearerbox_version(v2), "1.4.4")
         self.assertEqual(bearerbox_version(v3), "svn-r5150")
+        self.assertEqual(bearerbox_version(""), "")
 
 
 if __name__ == "__main__":
