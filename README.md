@@ -43,3 +43,26 @@ Run exporter using docker.
 docker pull apostvav/kannel_exporter
 docker run -d -p 9390:9390 apostvav/kannel_exporter
 ```
+
+### Run as a service
+If your on a systemd distro, create file */etc/systemd/system/kannel_exporter.service* with content:
+```
+[Unit]
+Description=Kannel Exporter
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=<USER>
+Group=<GROUP>
+ExecStart=/path/to/kannel_exporter.py --password-file /path/to/secret
+
+[Install]
+WantedBy=multi-user.target
+```
+and then run the commands:
+```
+systemctl daemon-reload
+systemctl start kannel_exporter.service
+systemctl enable kannel_exporter.service
+```
