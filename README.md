@@ -45,7 +45,7 @@ docker run -d -p 9390:9390 apostvav/kannel_exporter
 ```
 
 ### Run as a service
-If your on a systemd distro, create file */etc/systemd/system/kannel_exporter.service* with content:
+If you're on a systemd distro, create file */etc/systemd/system/kannel_exporter.service* with content:
 ```
 [Unit]
 Description=Kannel Exporter
