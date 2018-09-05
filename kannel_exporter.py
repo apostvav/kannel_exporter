@@ -49,10 +49,11 @@ def _xmlpostproc(path, key, value):
 
 
 class KannelCollector:
-    def __init__(self, target, password, filter_smsc):
+    def __init__(self, target, password, filter_smsc, collect_wdp):
         self._target = target
         self._password = password
         self._filter_smsc = filter_smsc
+        self._collect_wdp = collect_wdp
 
     def parse_kannel_status(self):
         url = self._target + "/status.xml?password=" + self._password
@@ -107,6 +108,36 @@ class KannelCollector:
                                    'Current uptime in seconds (*)')
         metric.add_sample('bearerbox_uptime_seconds', value=uptime, labels={})
         yield metric
+
+        # WDP metrics
+        if self._collect_wdp is True:
+            metric = CounterMetricFamily('bearerbox_wdp_received_total',
+                                         'Total number of WDP received')
+            metric.add_sample('bearerbox_wdp_received_total',
+                              value=int(response['gateway']['wdp']['received']['total']),
+                              labels={})
+            yield metric
+
+            metric = CounterMetricFamily('bearerbox_wdp_sent_total',
+                                         'Total number of WDP sent')
+            metric.add_sample('bearerbox_wdp_sent_total',
+                              value=int(response['gateway']['wdp']['sent']['total']),
+                              labels={})
+            yield metric
+
+            metric = GaugeMetricFamily('bearerbox_wdp_received_queued',
+                                       'Number of received WDP in queue')
+            metric.add_sample('bearerbox_wdp_received_queued',
+                               value=int(response['gateway']['wdp']['received']['queued']),
+                               labels={})
+            yield metric
+
+            metric = GaugeMetricFamily('bearerbox_wdp_sent_queued',
+                                       'Number of sent WDP in queue')
+            metric.add_sample('bearerbox_wdp_sent_queued',
+                              value=int(response['gateway']['wdp']['sent']['queued']),
+                              labels={})
+            yield metric
 
         # SMS metrics
         metric = CounterMetricFamily('bearerbox_sms_received_total',
@@ -305,6 +336,8 @@ def cli():
                         default=int(os.environ.get('KANNEL_EXPORTER_PORT', '9390')))
     parser.add_argument('--filter-smscs', dest='filter_smsc', action='store_true',
                         help='Filter out SMSC metrics')
+    parser.add_argument('--collect-wdp', dest='collect_wdp', action='store_true',
+                        help='Collect WDP metrics.')
     parser.add_argument('-v', '--version', dest='version', action='store_true',
                         help='Display version information and exit')
 
@@ -337,7 +370,7 @@ if __name__ == '__main__':
 
     start_http_server(args.port)
     REGISTRY.register(KannelCollector(args.target, status_password,
-                                      args.filter_smsc))
+                                      args.filter_smsc, args.collect_wdp))
 
     while True:
         time.sleep(1)

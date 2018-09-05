@@ -15,7 +15,7 @@ class KannelCollectorTestCase(unittest.TestCase):
         self.assertEqual(uptime3, 113)
 
     def test_kannel_collector(self):
-        exporter = KannelCollector('', '', False)
+        exporter = KannelCollector('', '', False, False)
         self.assertEqual(exporter.parse_kannel_status(), None)
 
     def test_bearerbox_version(self):
