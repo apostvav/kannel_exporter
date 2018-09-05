@@ -225,13 +225,20 @@ class KannelCollector:
 
             for box in response['gateway']['boxes']['box']:
                 box_labels = {'type':   box['type'],
-                              'id':     box['id'],
                               'ipaddr': box['IP']}
+
+                # some type of boxes (e.g wapbox) don't have IDs.
+                if 'id' in box.keys():
+                    box_labels['id'] = box['id']
+
                 metric_uptime.add_sample('bearerbox_box_uptime_seconds',
                                          value=uptime_to_secs(box['status']),
                                          labels=box_labels)
-                metric_queue.add_sample('bearerbox_box_queue',
-                                        value=int(box['queue']), labels=box_labels)
+
+                # some type of boxs (e.g wapbox) don't have queues.
+                if 'queue' in box.keys():
+                    metric_queue.add_sample('bearerbox_box_queue',
+                                            value=int(box['queue']), labels=box_labels)
 
             yield metric_uptime
             yield metric_queue
