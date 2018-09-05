@@ -4,8 +4,9 @@
 
 ## Usage
 ```
-kannel_exporter.py [-h] [--target TARGET] [--port PORT] [--filter-smscs] [-v]
-    [--password PASSWORD | --password-file PASSWORD_FILE]
+kannel_exporter.py [-h] [--target TARGET] [--port PORT]
+                   [--filter-smscs] [--collect-wdp] [-v]
+                   [--password PASSWORD | --password-file PASSWORD_FILE]
 ```
 
 ### Arguments
@@ -13,9 +14,10 @@ kannel_exporter.py [-h] [--target TARGET] [--port PORT] [--filter-smscs] [-v]
   -h, --help            show this help message and exit
   --target TARGET       Target kannel server, PROTO:HOST:PORT. (default http://127.0.0.1:13000)
   --port PORT           Exporter port. (default 9390)
-  --filter-smscs        Filter out SMSC metrics
-  -v, --version         Display version information and exit
-  --password PASSWORD   Password of the kannel status page. Mandatory argument
+  --filter-smscs        Filter out SMSC metrics.
+  --collect-wdp         Collect WDP metrics.
+  -v, --version         Display version information and exit.
+  --password PASSWORD   Password of the kannel status page.
   --password-file PASSWORD_FILE
                         File contains the password the kannel status page.
 ```
