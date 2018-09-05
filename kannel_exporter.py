@@ -281,6 +281,20 @@ class KannelCollector:
             yield metric_dlr_sent
 
 
+def get_password(password, password_file):
+    if password_file is not None:
+        try:
+            with open(password_file) as fd:
+                status_password = fd.read().strip()
+        except OSError as err:
+            sys.exit("Failed to open file {0}.\n{1}".format(password_file, err))
+        except UnicodeError as err:
+            sys.exit("Failed to read file {0}.\n{1}".format(password_file, err))
+    else:
+        status_password = password
+    return status_password
+
+
 def cli():
     parser = argparse.ArgumentParser(description="Kannel exporter for Prometheus")
     parser.add_argument('--target', dest='target',
@@ -319,18 +333,7 @@ if __name__ == '__main__':
         parser.error('Option --password or --password-file must be set.')
 
     # get password
-    if args.password_file is not None:
-        try:
-            with open(args.password_file) as fd:
-                status_password = fd.read().strip()
-        except OSError as err:
-            sys.exit("Failed to open file {0}.\n{1}".format(args.password_file,
-                                                            err))
-        except UnicodeError as err:
-            sys.exit("Failed to read file {0}.\n{1}".format(args.password_file,
-                                                            err))
-    else:
-        status_password = args.password
+    status_password = get_password(args.password, args.password_file)
 
     start_http_server(args.port)
     REGISTRY.register(KannelCollector(args.target, status_password,
