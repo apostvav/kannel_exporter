@@ -2,6 +2,7 @@
 
 import unittest
 from kannel_exporter import KannelCollector, uptime_to_secs, bearerbox_version
+from kannel_exporter import get_password
 
 
 class KannelCollectorTestCase(unittest.TestCase):
@@ -17,6 +18,10 @@ class KannelCollectorTestCase(unittest.TestCase):
     def test_kannel_collector(self):
         exporter = KannelCollector('', '', False, False)
         self.assertEqual(exporter.parse_kannel_status(), None)
+
+    def test_get_password(self):
+        password = get_password('mypass', None)
+        self.assertEqual(password, 'mypass')
 
     def test_bearerbox_version(self):
         v1 = """Kannel bearerbox version `1.4.5'.
