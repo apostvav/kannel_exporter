@@ -3,7 +3,7 @@
 # Prometheus custom collector for Kannel gateway
 # https://github.com/apostvav/kannel_exporter
 
-__version__ = '0.1.2'
+__version__ = '0.2'
 
 import argparse
 import time
@@ -204,48 +204,51 @@ class KannelCollector:
         yield metric
 
         # Box metrics
-        metric = GaugeMetricFamily('bearerbox_boxes_connected',
-                                   'Number of boxes connected on the gateway')
-
-        if response['gateway']['boxes'] != '':
-            metric_uptime = GaugeMetricFamily('bearerbox_box_uptime_seconds',
-                                              'Box uptime in seconds (*)')
-            metric_queue = GaugeMetricFamily('bearerbox_box_queue',
+        box_connections = {'wapbox': 0,
+                           'smsbox': 0}
+        box_details = {}
+        metric_box_connections = GaugeMetricFamily('bearerbox_box_connections',
+                                                   'Number of box connections')
+        metric_box_queue = GaugeMetricFamily('bearerbox_box_queue',
                                              'Number of messages in box queue')
 
+        if response['gateway']['boxes'] != '':
             # when there's only one box connected on the gateway
             # xmltodict returns an OrderedDict instead of a list of OrderedDicts
             if not isinstance(response['gateway']['boxes']['box'], list):
                 response['gateway']['boxes']['box'] = [response['gateway']['boxes']['box']]
 
-            metric.add_sample('bearerbox_boxes_connected',
-                              value=len(response['gateway']['boxes']['box']),
-                              labels={})
-            yield metric
-
             for box in response['gateway']['boxes']['box']:
-                box_labels = {'type':   box['type'],
-                              'ipaddr': box['IP']}
+                if box['type'] in box_connections.keys():
+                    box_connections[box['type']] += 1
+                else:
+                    box_connections[box['type']] = 1
 
                 # some type of boxes (e.g wapbox) don't have IDs.
-                if 'id' in box.keys():
-                    box_labels['id'] = box['id']
+                if 'id' not in box.keys():
+                    box['id'] = ""
 
-                metric_uptime.add_sample('bearerbox_box_uptime_seconds',
-                                         value=uptime_to_secs(box['status']),
-                                         labels=box_labels)
+                tuplkey = (box['type'], box['id'], box['IP'])
 
                 # some type of boxs (e.g wapbox) don't have queues.
                 if 'queue' in box.keys():
-                    metric_queue.add_sample('bearerbox_box_queue',
-                                            value=int(box['queue']), labels=box_labels)
+                    if tuplkey in box_details.keys():
+                        box_details[tuplkey]['queue'] += int(box['queue'])
+                    else:
+                        box_details[tuplkey] = {}
+                        box_details[tuplkey]['queue'] = int(box['queue'])
 
-            yield metric_uptime
-            yield metric_queue
+        for key, value in box_connections.items():
+            metric_box_connections.add_sample('bearerbox_box_connections',
+                                              value=value, labels={'type': key})
+        yield metric_box_connections
 
-        else:
-            metric.add_sample('bearerbox_boxes_connected', value=0, labels={})
-            yield metric
+        for key,value in box_details.items():
+            box_labels = {'type': key[0], 'id': key[1], 'ipaddr': key[2]}
+            metric_box_queue.add_sample('bearerbox_box_queue',
+                                        value=value['queue'],
+                                        labels=box_labels)
+        yield metric_box_queue
 
         # SMSC metrics
         metric = GaugeMetricFamily('bearerbox_smsc_connections',
