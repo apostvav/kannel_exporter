@@ -49,11 +49,13 @@ def _xmlpostproc(path, key, value):
 
 
 class KannelCollector:
-    def __init__(self, target, password, filter_smsc, collect_wdp):
+    def __init__(self, target, password, filter_smsc,
+                 collect_wdp=False, collect_box_uptime=False):
         self._target = target
         self._password = password
         self._filter_smsc = filter_smsc
         self._collect_wdp = collect_wdp
+        self._collect_box_uptime = collect_box_uptime
 
     def parse_kannel_status(self):
         url = self._target + "/status.xml?password=" + self._password
@@ -208,10 +210,13 @@ class KannelCollector:
                            'smsbox': 0}
         box_details = {}
         metric_box_connections = GaugeMetricFamily('bearerbox_box_connections',
-                                                   'Number of box connections')
+                                                       'Number of box connections')
         metric_box_queue = GaugeMetricFamily('bearerbox_box_queue',
                                              'Number of messages in box queue')
 
+        if self._collect_box_uptime is True:
+            metric_box_uptime = GaugeMetricFamily('bearerbox_box_uptime_seconds',
+                                                  'Box uptime in seconds (*)')
         if response['gateway']['boxes'] != '':
             # when there's only one box connected on the gateway
             # xmltodict returns an OrderedDict instead of a list of OrderedDicts
@@ -238,6 +243,18 @@ class KannelCollector:
                         box_details[tuplkey] = {}
                         box_details[tuplkey]['queue'] = int(box['queue'])
 
+                # collect box uptime metrics
+                # In case of multiple boxes with same type, id and host.
+                # Only the uptime of the first occurence will be exposed
+                # in order to avoid duplicates.
+                if self._collect_box_uptime is True:
+                    if tuplkey in box_details.keys():
+                        if 'uptime' not in box_details[tuplkey].keys():
+                            box_details[tuplkey]['uptime'] = uptime_to_secs(box['status'])
+                    else:
+                        box_details[tuplkey] = {}
+                        box_details[tuplkey]['uptime'] = uptime_to_secs(box['status'])
+
         for key, value in box_connections.items():
             metric_box_connections.add_sample('bearerbox_box_connections',
                                               value=value, labels={'type': key})
@@ -245,10 +262,18 @@ class KannelCollector:
 
         for key,value in box_details.items():
             box_labels = {'type': key[0], 'id': key[1], 'ipaddr': key[2]}
-            metric_box_queue.add_sample('bearerbox_box_queue',
-                                        value=value['queue'],
-                                        labels=box_labels)
+            if 'queue' in value.keys():
+                metric_box_queue.add_sample('bearerbox_box_queue',
+                                            value=value['queue'],
+                                            labels=box_labels)
+            if self._collect_box_uptime is True:
+                metric_box_uptime.add_sample('bearerbox_box_uptime_seconds',
+                                             value=value['uptime'],
+                                             labels=box_labels)
+
         yield metric_box_queue
+        if self._collect_box_uptime is True:
+            yield metric_box_uptime
 
         # SMSC metrics
         metric = GaugeMetricFamily('bearerbox_smsc_connections',
@@ -348,6 +373,8 @@ def cli():
                         help='Filter out SMSC metrics')
     parser.add_argument('--collect-wdp', dest='collect_wdp', action='store_true',
                         help='Collect WDP metrics.')
+    parser.add_argument('--collect-box-uptime', dest='collect_box_uptime',
+                        action='store_true', help='Collect boxes uptime metrics')
     parser.add_argument('-v', '--version', dest='version', action='store_true',
                         help='Display version information and exit')
 
@@ -380,7 +407,8 @@ if __name__ == '__main__':
 
     start_http_server(args.port)
     REGISTRY.register(KannelCollector(args.target, status_password,
-                                      args.filter_smsc, args.collect_wdp))
+                                      args.filter_smsc, args.collect_wdp,
+                                      args.collect_box_uptime))
 
     while True:
         time.sleep(1)
