@@ -111,99 +111,45 @@ class KannelCollector:
         metric.add_sample('bearerbox_uptime_seconds', value=uptime, labels={})
         yield metric
 
-        # WDP metrics
+        # WDP, SMS & DLR metrics
+        message_type = ['sms','dlr']
         if self._collect_wdp is True:
-            metric = CounterMetricFamily('bearerbox_wdp_received_total',
-                                         'Total number of WDP received')
-            metric.add_sample('bearerbox_wdp_received_total',
-                              value=int(response['gateway']['wdp']['received']['total']),
-                              labels={})
-            yield metric
+            type = ['wdp'] + type
 
-            metric = CounterMetricFamily('bearerbox_wdp_sent_total',
-                                         'Total number of WDP sent')
-            metric.add_sample('bearerbox_wdp_sent_total',
-                              value=int(response['gateway']['wdp']['sent']['total']),
-                              labels={})
-            yield metric
+        for type in message_type:
+            for k, v in response['gateway'][type].items():
+                if isinstance(v, dict):
+                    for k2, v2 in v.items():
+                        metric_name = 'bearerbox_{0}_{1}_{2}'.format(type, k, k2)
+                        if k2 == 'total':
+                            metric_help = 'Total number of {0} {1}'.format(type.upper(), k)
+                            metric = CounterMetricFamily(metric_name, metric_help)
+                        else:
+                            metric_help = 'Number of {0} {1} in queue'.format(k, type.upper())
+                            metric = GaugeMetricFamily(metric_name, metric_help)
 
-            metric = GaugeMetricFamily('bearerbox_wdp_received_queued',
-                                       'Number of received WDP in queue')
-            metric.add_sample('bearerbox_wdp_received_queued',
-                               value=int(response['gateway']['wdp']['received']['queued']),
-                               labels={})
-            yield metric
+                        metric.add_sample(metric_name, value=int(v2), labels={})
+                        yield metric
 
-            metric = GaugeMetricFamily('bearerbox_wdp_sent_queued',
-                                       'Number of sent WDP in queue')
-            metric.add_sample('bearerbox_wdp_sent_queued',
-                              value=int(response['gateway']['wdp']['sent']['queued']),
-                              labels={})
-            yield metric
+                elif k not in ['inbound', 'outbound']:
+                    metric_name = 'bearerbox_{0}_{1}'.format(type, k)
+                    metric_value = v
+                    metric_labels = {}
 
-        # SMS metrics
-        metric = CounterMetricFamily('bearerbox_sms_received_total',
-                                     'Total number of SMS received')
-        metric.add_sample('bearerbox_sms_received_total',
-                          value=int(response['gateway']['sms']['received']['total']),
-                          labels={})
-        yield metric
+                    if type == 'sms' and k == 'storesize':
+                        metric_help = 'Number of SMS in storesize'
+                    elif type == 'dlr':
+                        if k == 'queued':
+                            metric_help = 'Number of DLRs in queue'
+                        elif k == 'storage':
+                            metric_help = 'DLR storage type info'
+                            metric_value = 1
+                            metric_labels = {'storage': v}
 
-        metric = CounterMetricFamily('bearerbox_sms_sent_total',
-                                     'Total number of SMS sent')
-        metric.add_sample('bearerbox_sms_sent_total',
-                          value=int(response['gateway']['sms']['sent']['total']),
-                          labels={})
-        yield metric
-
-        metric = GaugeMetricFamily('bearerbox_sms_received_queued',
-                                   'Number of received SMS in queue')
-        metric.add_sample('bearerbox_sms_received_queued',
-                          value=int(response['gateway']['sms']['received']['queued']),
-                          labels={})
-        yield metric
-
-        metric = GaugeMetricFamily('bearerbox_sms_sent_queued',
-                                   'Number of sent SMS in queue')
-        metric.add_sample('bearerbox_sms_sent_queued',
-                          value=int(response['gateway']['sms']['sent']['queued']),
-                          labels={})
-        yield metric
-
-        metric = GaugeMetricFamily('bearerbox_sms_storesize',
-                                   'Number of SMS in storesize')
-        metric.add_sample('bearerbox_sms_storesize',
-                          value=int(response['gateway']['sms']['storesize']),
-                          labels={})
-        yield metric
-
-        # DLR metrics
-        metric = CounterMetricFamily('bearerbox_dlr_received_total',
-                                     'Total number of DLRs received')
-        metric.add_sample('bearerbox_dlr_received_total',
-                          value=int(response['gateway']['dlr']['received']['total']),
-                          labels={})
-        yield metric
-
-        metric = CounterMetricFamily('bearerbox_dlr_sent_total',
-                                     'Total number of DLRs sent')
-        metric.add_sample('bearerbox_dlr_sent_total',
-                          value=int(response['gateway']['dlr']['sent']['total']),
-                          labels={})
-        yield metric
-
-        metric = GaugeMetricFamily('bearerbox_dlr_queued',
-                                   'Number of DLRs in queue')
-        metric.add_sample('bearerbox_dlr_queued',
-                          value=int(response['gateway']['dlr']['queued']),
-                          labels={})
-        yield metric
-
-        metric = GaugeMetricFamily('bearerbox_dlr_storage',
-                                   'DLR storage type info')
-        metric.add_sample('bearerbox_dlr_storage', value=1,
-                          labels={'storage': response['gateway']['dlr']['storage']})
-        yield metric
+                    metric = GaugeMetricFamily(metric_name, metric_help)
+                    metric.add_sample(metric_name, value=int(metric_value),
+                                      labels=metric_labels)
+                    yield metric
 
         # Box metrics
         box_connections = {'wapbox': 0,
