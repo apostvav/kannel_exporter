@@ -6,6 +6,7 @@
 __version__ = '0.2.1'
 
 import argparse
+import logging
 import time
 import os
 import sys
@@ -17,6 +18,9 @@ from prometheus_client import start_http_server
 from prometheus_client.core import GaugeMetricFamily, CounterMetricFamily
 from prometheus_client import REGISTRY
 import xmltodict
+
+# logger
+logger = logging.getLogger('kannel_exporter')
 
 
 def uptime_to_secs(uptime):
@@ -36,8 +40,12 @@ def bearerbox_version(version):
         if version.find('Kannel bearerbox version ') == 0:
             version = version[25:].strip('`').rstrip('\'.')
         else:
+            logger.warning("Bearerbox version could not be found. " +
+                           "Version value set to empty string.")
             version = ""
     except IndexError:
+        logger.error("Failed to parse gateway version. " +
+                     "Version value set to empty string.")
         version = ""
     return version
 
@@ -69,15 +77,15 @@ class KannelCollector:
                 status = xmltodict.parse(xml, postprocessor=_xmlpostproc)
 
             if status['gateway'] == 'Denied':
-                print("Authentication failed.")
+                logger.error("Authentication failed.")
                 return None
 
         except ValueError as err:
-            print("Uknown URL type: {0}".format(url))
+            logger.error("Uknown URL type: %s", url)
         except URLError as err:
-            print("Failed to open target URL: {0}".format(url))
+            logger.error("Failed to open target URL: %s", url)
         except xmltodict.expat.ExpatError as err:
-            print("Failed to parse status XML")
+            logger.error("Failed to parse status XML.")
 
         return status
 
@@ -156,7 +164,7 @@ class KannelCollector:
                            'smsbox': 0}
         box_details = {}
         metric_box_connections = GaugeMetricFamily('bearerbox_box_connections',
-                                                       'Number of box connections')
+                                                   'Number of box connections')
         metric_box_queue = GaugeMetricFamily('bearerbox_box_queue',
                                              'Number of messages in box queue')
 
@@ -310,7 +318,8 @@ def get_password(password, password_file):
 def cli():
     parser = argparse.ArgumentParser(description="Kannel exporter for Prometheus")
     parser.add_argument('--target', dest='target',
-                        help='Target kannel server, PROTO:HOST:PORT. (default http://127.0.0.1:13000)',
+                        help='Target kannel server, PROTO:HOST:PORT. ' +
+                        '(default http://127.0.0.1:13000)',
                         default=os.environ.get('KANNEL_HOST', 'http://127.0.0.1:13000'))
     parser.add_argument('--port', dest='port', type=int,
                         help='Exporter port. (default 9390)',
@@ -321,6 +330,9 @@ def cli():
                         help='Collect WDP metrics.')
     parser.add_argument('--collect-box-uptime', dest='collect_box_uptime',
                         action='store_true', help='Collect boxes uptime metrics')
+    parser.add_argument('--log-level', dest='log_level', default='WARNING',
+                        choices=['DEBUG','INFO','WARNING','ERROR','CRITICAL'],
+                        help='Define the logging level')
     parser.add_argument('-v', '--version', dest='version', action='store_true',
                         help='Display version information and exit')
 
@@ -329,7 +341,7 @@ def cli():
                             help='Password of the kannel status page. Mandatory argument',
                             default=os.environ.get('KANNEL_STATUS_PASSWORD'))
     pass_group.add_argument('--password-file', dest='password_file',
-                            help='File contains the password the kannel status page.')
+                            help='File contains the kannel status password')
     return parser
 
 
@@ -347,6 +359,11 @@ if __name__ == '__main__':
     # check if password has been set
     if args.password is None and args.password_file is None:
         parser.error('Option --password or --password-file must be set.')
+
+    # logger configuration
+    logging.basicConfig(format='%(asctime)s %(name)s %(levelname)s: %(message)s',
+                        datefmt="%Y-%m-%d %H:%M:%S")
+    logger.setLevel(args.log_level)
 
     # get password
     status_password = get_password(args.password, args.password_file)
