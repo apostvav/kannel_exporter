@@ -19,7 +19,7 @@ kannel_exporter.py [-h] [--target TARGET] [--port PORT]
   --filter-smscs        Filter out SMSC metrics
   --collect-wdp         Collect WDP metrics
   --collect-box-uptime  Collect boxes uptime metrics
-  ----log-level LEVEL   Define the logging level
+  --log-level LEVEL   Define the logging level
   -v, --version         Display version information and exit
   --password PASSWORD   Password of the kannel status page
   --password-file FILE  File contains the kannel status password
@@ -71,3 +71,7 @@ systemctl daemon-reload
 systemctl start kannel_exporter.service
 systemctl enable kannel_exporter.service
 ```
+
+## Contribute
+Any contribution is welcome. Feel free to open issues and pull requests.
+For any scraping issues you may have, please open an issue and attach the status xml file. Don't forget to strip any information you don't want to share.  
