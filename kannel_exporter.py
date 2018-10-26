@@ -3,7 +3,7 @@
 # Prometheus custom collector for Kannel gateway
 # https://github.com/apostvav/kannel_exporter
 
-__version__ = '0.2.1'
+__version__ = '0.2.2'
 
 import argparse
 import logging
@@ -24,7 +24,7 @@ logger = logging.getLogger('kannel_exporter')
 
 
 def uptime_to_secs(uptime):
-    uptime = findall('\d+', uptime)
+    uptime = findall(r'\d+', uptime)
     days_in_secs = int(uptime[0]) * 86400
     hours_in_secs = int(uptime[1]) * 3600
     minutes_in_secs = int(uptime[2]) * 60
@@ -81,11 +81,11 @@ class KannelCollector:
                 return None
 
         except ValueError as err:
-            logger.error("Uknown URL type: %s", url)
+            logger.error("Uknown URL type: %s. Error: %s", url, err)
         except URLError as err:
-            logger.error("Failed to open target URL: %s", url)
+            logger.error("Failed to open target URL: %s. Error: %s", url, err)
         except xmltodict.expat.ExpatError as err:
-            logger.error("Failed to parse status XML.")
+            logger.error("Failed to parse status XML. Error: %s", err)
 
         return status
 
@@ -122,7 +122,7 @@ class KannelCollector:
         # WDP, SMS & DLR metrics
         message_type = ['sms','dlr']
         if self._collect_wdp is True:
-            type = ['wdp'] + type
+            message_type = ['wdp'] + message_type
 
         for type in message_type:
             for k, v in response['gateway'][type].items():
