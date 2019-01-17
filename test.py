@@ -16,7 +16,7 @@ class KannelCollectorTestCase(unittest.TestCase):
         self.assertEqual(uptime3, 113)
 
     def test_kannel_collector(self):
-        exporter = KannelCollector('', '', False, False)
+        exporter = KannelCollector('', '', False, ['wapbox', 'smsbox'])
         self.assertEqual(exporter.parse_kannel_status(), None)
 
     def test_get_password(self):

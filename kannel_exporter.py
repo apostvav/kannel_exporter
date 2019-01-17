@@ -3,7 +3,7 @@
 # Prometheus custom collector for Kannel gateway
 # https://github.com/apostvav/kannel_exporter
 
-__version__ = '0.2.2'
+__version__ = '0.2.3'
 
 import argparse
 import logging
@@ -57,13 +57,14 @@ def _xmlpostproc(path, key, value):
 
 
 class KannelCollector:
-    def __init__(self, target, password, filter_smsc,
+    def __init__(self, target, password, filter_smsc, box_connections,
                  collect_wdp=False, collect_box_uptime=False):
         self._target = target
         self._password = password
         self._filter_smsc = filter_smsc
         self._collect_wdp = collect_wdp
         self._collect_box_uptime = collect_box_uptime
+        self._box_connections = box_connections
 
     def parse_kannel_status(self):
         url = self._target + "/status.xml?password=" + self._password
@@ -160,8 +161,7 @@ class KannelCollector:
                     yield metric
 
         # Box metrics
-        box_connections = {'wapbox': 0,
-                           'smsbox': 0}
+        box_connections = {b: 0 for b in self._box_connections}
         box_details = {}
         metric_box_connections = GaugeMetricFamily('bearerbox_box_connections',
                                                    'Number of box connections')
@@ -330,6 +330,9 @@ def cli():
                         help='Collect WDP metrics.')
     parser.add_argument('--collect-box-uptime', dest='collect_box_uptime',
                         action='store_true', help='Collect boxes uptime metrics')
+    parser.add_argument('--box-connection-types', dest='box_connections',
+                        nargs='+', default=['wapbox', 'smsbox'],
+                        help='List of box connection types. (default wapbox, smsbox')
     parser.add_argument('--log-level', dest='log_level', default='WARNING',
                         choices=['DEBUG','INFO','WARNING','ERROR','CRITICAL'],
                         help='Define the logging level')
@@ -370,7 +373,9 @@ if __name__ == '__main__':
 
     start_http_server(args.port)
     REGISTRY.register(KannelCollector(args.target, status_password,
-                                      args.filter_smsc, args.collect_wdp,
+                                      args.filter_smsc,
+                                      args.box_connections,
+                                      args.collect_wdp,
                                       args.collect_box_uptime))
 
     while True:

@@ -12,17 +12,18 @@ kannel_exporter.py [-h] [--target TARGET] [--port PORT]
 
 ### Arguments
 ```
-  -h, --help            show this help message and exit
-  --target TARGET       Target kannel server, PROTO:HOST:PORT
-                        (default http://127.0.0.1:13000)
-  --port PORT           Exporter port. (default 9390)
-  --filter-smscs        Filter out SMSC metrics
-  --collect-wdp         Collect WDP metrics
-  --collect-box-uptime  Collect boxes uptime metrics
-  --log-level LEVEL   Define the logging level
-  -v, --version         Display version information and exit
-  --password PASSWORD   Password of the kannel status page
-  --password-file FILE  File contains the kannel status password
+  -h, --help             show this help message and exit
+  --target TARGET        Target kannel server, PROTO:HOST:PORT
+                         (default http://127.0.0.1:13000)
+  --port PORT            Exporter port. (default 9390)
+  --filter-smscs         Filter out SMSC metrics
+  --collect-wdp          Collect WDP metrics
+  --collect-box-uptime   Collect boxes uptime metrics
+  --box-connection-types List of box connection types. (default wapbox, smsbox)
+  --log-level LEVEL      Define the logging level
+  -v, --version          Display version information and exit
+  --password PASSWORD    Password of the kannel status page
+  --password-file FILE   File contains the kannel status password
 ```
 
 ### Environment Variables
