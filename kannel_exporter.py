@@ -39,6 +39,8 @@ def bearerbox_version(version):
         # strip 'Kannel bearerbox version ' (length 25)
         if version.find('Kannel bearerbox version ') == 0:
             version = version[25:].strip('`').rstrip('\'.')
+        elif version.find('Kannel-HA bearerbox version ') == 0:
+            version = version[25:].strip('`').rstrip('\'.')
         else:
             logger.warning("Bearerbox version could not be found. " +
                            "Version value set to empty string.")
