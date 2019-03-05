@@ -16,7 +16,10 @@ from re import findall
 from collections import OrderedDict
 from prometheus_client import start_http_server
 from prometheus_client.core import GaugeMetricFamily, CounterMetricFamily
-from prometheus_client import REGISTRY
+from prometheus_client import REGISTRY, make_wsgi_app
+from wsgiref.simple_server import make_server
+
+
 import xmltodict
 
 # logger
@@ -373,12 +376,12 @@ if __name__ == '__main__':
     # get password
     status_password = get_password(args.password, args.password_file)
 
-    start_http_server(args.port)
     REGISTRY.register(KannelCollector(args.target, status_password,
                                       args.filter_smsc,
                                       args.box_connections,
                                       args.collect_wdp,
                                       args.collect_box_uptime))
 
-    while True:
-        time.sleep(1)
+    app = make_wsgi_app()
+    httpd = make_server('', args.port, app)
+    httpd.serve_forever()
