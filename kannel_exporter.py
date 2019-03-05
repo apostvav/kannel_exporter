@@ -328,7 +328,7 @@ def cli():
                         default=os.environ.get('KANNEL_HOST', 'http://127.0.0.1:13000'))
     parser.add_argument('--port', dest='port', type=int,
                         help='Exporter port. (default 9390)',
-                        default=int(os.environ.get('KANNEL_EXPORTER_PORT', '9405')))
+                        default=int(os.environ.get('KANNEL_EXPORTER_PORT', '9390')))
     parser.add_argument('--filter-smscs', dest='filter_smsc', action='store_true',
                         help='Filter out SMSC metrics')
     parser.add_argument('--collect-wdp', dest='collect_wdp', action='store_true',
