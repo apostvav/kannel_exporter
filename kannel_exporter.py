@@ -3,23 +3,19 @@
 # Prometheus custom collector for Kannel gateway
 # https://github.com/apostvav/kannel_exporter
 
-__version__ = '0.2.3'
+__version__ = '0.2.4'
 
 import argparse
 import logging
-import time
 import os
 import sys
 from urllib.request import urlopen
 from urllib.error import URLError
 from re import findall
 from collections import OrderedDict
-from prometheus_client import start_http_server
+from wsgiref.simple_server import make_server
 from prometheus_client.core import GaugeMetricFamily, CounterMetricFamily
 from prometheus_client import REGISTRY, make_wsgi_app
-from wsgiref.simple_server import make_server
-
-
 import xmltodict
 
 # logger
@@ -126,7 +122,7 @@ class KannelCollector:
         yield metric
 
         # WDP, SMS & DLR metrics
-        message_type = ['sms','dlr']
+        message_type = ['sms', 'dlr']
         if self._collect_wdp is True:
             message_type = ['wdp'] + message_type
 
@@ -219,7 +215,7 @@ class KannelCollector:
                                               value=value, labels={'type': key})
         yield metric_box_connections
 
-        for key,value in box_details.items():
+        for key, value in box_details.items():
             box_labels = {'type': key[0], 'id': key[1], 'ipaddr': key[2]}
             if 'queue' in value.keys():
                 metric_box_queue.add_sample('bearerbox_box_queue',
@@ -339,7 +335,7 @@ def cli():
                         nargs='+', default=['wapbox', 'smsbox'],
                         help='List of box connection types. (default wapbox, smsbox')
     parser.add_argument('--log-level', dest='log_level', default='WARNING',
-                        choices=['DEBUG','INFO','WARNING','ERROR','CRITICAL'],
+                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
                         help='Define the logging level')
     parser.add_argument('-v', '--version', dest='version', action='store_true',
                         help='Display version information and exit')
