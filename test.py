@@ -47,9 +47,18 @@ Libxml version 2.9.1.
 Using OpenSSL 1.0.1e-fips 11 Feb 2013.
 Compiled with MySQL 5.5.44-MariaDB, using MySQL 5.5.52-MariaDB.
 Using native malloc."""
+        v4 = """Kannel-HA bearerbox version `svn-r5150'.
+Build `Sep 28 2015 02:39:14', compiler `4.8.3 20140911 (Red Hat 4.8.3-9)'.
+System Linux, release 3.10.0-514.21.1.el7.x86_64, version #1 SMP Thu May 25 17:04:51 UTC 2017, machine x86_64.
+Hostname c7.home.lan, IP 10.0.0.101.
+Libxml version 2.9.1.
+Using OpenSSL 1.0.1e-fips 11 Feb 2013.
+Compiled with MySQL 5.5.44-MariaDB, using MySQL 5.5.52-MariaDB.
+Using native malloc."""
         self.assertEqual(bearerbox_version(v1), "1.4.5")
         self.assertEqual(bearerbox_version(v2), "1.4.4")
         self.assertEqual(bearerbox_version(v3), "svn-r5150")
+        self.assertEqual(bearerbox_version(v4), "svn-r5150")
         self.assertEqual(bearerbox_version(""), "")
 
 
