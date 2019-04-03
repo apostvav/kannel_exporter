@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-# Prometheus custom collector for Kannel gateway
-# https://github.com/apostvav/kannel_exporter
+"""Prometheus custom collector for Kannel gateway
+https://github.com/apostvav/kannel_exporter"""
 
 __version__ = '0.2.4'
 
@@ -35,18 +35,17 @@ def uptime_to_secs(uptime):
 def bearerbox_version(version):
     try:
         version = version.split('\n')[0]
-        # strip 'Kannel bearerbox version ' (length 25)
-        if version.find('Kannel bearerbox version ') == 0:
-            version = version[25:].strip('`').rstrip('\'.')
-        elif version.find('Kannel-HA bearerbox version ') == 0:
-            version = version[28:].strip('`').rstrip('\'.')
+        version_position = version.find('version ')
+        # 'version ' is 8 chars long
+        if version_position != -1:
+            version = version[version_position + 8:].strip('`').rstrip('\'.')
         else:
-            logger.warning("Bearerbox version could not be found. " +
-                           "Version value set to empty string.")
+            logger.warning(('Bearerbox version could not be found. '
+                            'Version value set to empty string.'))
             version = ""
     except IndexError:
-        logger.error("Failed to parse gateway version. " +
-                     "Version value set to empty string.")
+        logger.error(('Failed to parse gateway version. '
+                      'Version value set to empty string.'))
         version = ""
     return version
 
@@ -126,29 +125,29 @@ class KannelCollector:
         if self._collect_wdp is True:
             message_type = ['wdp'] + message_type
 
-        for type in message_type:
-            for k, v in response['gateway'][type].items():
+        for type_ in message_type:
+            for k, v in response['gateway'][type_].items():
                 if isinstance(v, dict):
                     for k2, v2 in v.items():
-                        metric_name = 'bearerbox_{0}_{1}_{2}'.format(type, k, k2)
+                        metric_name = 'bearerbox_{0}_{1}_{2}'.format(type_, k, k2)
                         if k2 == 'total':
-                            metric_help = 'Total number of {0} {1}'.format(type.upper(), k)
+                            metric_help = 'Total number of {0} {1}'.format(type_.upper(), k)
                             metric = CounterMetricFamily(metric_name, metric_help)
                         else:
-                            metric_help = 'Number of {0} {1} in queue'.format(k, type.upper())
+                            metric_help = 'Number of {0} {1} in queue'.format(k, type_.upper())
                             metric = GaugeMetricFamily(metric_name, metric_help)
 
                         metric.add_sample(metric_name, value=int(v2), labels={})
                         yield metric
 
                 elif k not in ['inbound', 'outbound']:
-                    metric_name = 'bearerbox_{0}_{1}'.format(type, k)
+                    metric_name = 'bearerbox_{0}_{1}'.format(type_, k)
                     metric_value = v
                     metric_labels = {}
 
-                    if type == 'sms' and k == 'storesize':
+                    if type_ == 'sms' and k == 'storesize':
                         metric_help = 'Number of SMS in storesize'
-                    elif type == 'dlr':
+                    elif type_ == 'dlr':
                         if k == 'queued':
                             metric_help = 'Number of DLRs in queue'
                         elif k == 'storage':
@@ -190,7 +189,7 @@ class KannelCollector:
 
                 tuplkey = (box['type'], box['id'], box['IP'])
 
-                # some type of boxs (e.g wapbox) don't have queues.
+                # some type of boxes (e.g wapbox) don't have queues.
                 if 'queue' in box.keys():
                     if tuplkey in box_details.keys():
                         box_details[tuplkey]['queue'] += int(box['queue'])
@@ -349,8 +348,7 @@ def cli():
     return parser
 
 
-if __name__ == '__main__':
-
+def main():
     # command line arguments
     parser = cli()
     args = parser.parse_args()
@@ -381,3 +379,7 @@ if __name__ == '__main__':
     app = make_wsgi_app()
     httpd = make_server('', args.port, app)
     httpd.serve_forever()
+
+
+if __name__ == '__main__':
+    main()
