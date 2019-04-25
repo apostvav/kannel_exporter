@@ -241,22 +241,22 @@ class KannelCollector:
         if self._filter_smsc is False:
             metric_failed = CounterMetricFamily('bearerbox_smsc_failed_messages_total',
                                                 'Total number of SMSC failed messages',
-                                                labels=["smsc_id"])
+                                                labels=["smsc_id", "endpoint"])
             metric_queued = GaugeMetricFamily('bearerbox_smsc_queued_messages',
                                               'Number of SMSC queued messages',
-                                              labels=["smsc_id"])
+                                              labels=["smsc_id", "endpoint"])
             metric_sms_received = CounterMetricFamily('bearerbox_smsc_received_sms_total',
                                                       'Total number of received SMS by SMSC',
-                                                      labels=["smsc_id"])
+                                                      labels=["smsc_id", "endpoint"])
             metric_sms_sent = CounterMetricFamily('bearerbox_smsc_sent_sms_total',
                                                   'Total number of SMS sent to SMSC',
-                                                  labels=["smsc_id"])
+                                                  labels=["smsc_id", "endpoint"])
             metric_dlr_received = CounterMetricFamily('bearerbox_smsc_received_dlr_total',
                                                       'Total number of DLRs received by SMSC',
-                                                      labels=["smsc_id"])
+                                                      labels=["smsc_id", "endpoint"])
             metric_dlr_sent = CounterMetricFamily('bearerbox_smsc_sent_dlr_total',
                                                   'Total number of DLRs sent to SMSC',
-                                                  labels=["smsc_id"])
+                                                  labels=["smsc_id", "endpoint"])
 
             # Group SMSCs by smsc-id
             smsc_stats_by_id = OrderedDict()
@@ -287,12 +287,12 @@ class KannelCollector:
                     smsc_stats_by_id[smscid]['dlr']['sent'] = int(smsc['dlr']['sent'])
 
             for smsc in smsc_stats_by_id:
-                metric_failed.add_metric([smsc], smsc_stats_by_id[smsc]['failed'])
-                metric_queued.add_metric([smsc], smsc_stats_by_id[smsc]['queued'])
-                metric_sms_received.add_metric([smsc], smsc_stats_by_id[smsc]['sms']['received'])
-                metric_sms_sent.add_metric([smsc], smsc_stats_by_id[smsc]['sms']['sent'])
-                metric_dlr_received.add_metric([smsc], smsc_stats_by_id[smsc]['dlr']['received'])
-                metric_dlr_sent.add_metric([smsc], smsc_stats_by_id[smsc]['dlr']['sent'])
+                metric_failed.add_metric([smsc, "ocmgp://{}".format(smsc)], smsc_stats_by_id[smsc]['failed'])
+                metric_queued.add_metric([smsc, "ocmgp://{}".format(smsc)], smsc_stats_by_id[smsc]['queued'])
+                metric_sms_received.add_metric([smsc, "ocmgp://{}".format(smsc)], smsc_stats_by_id[smsc]['sms']['received'])
+                metric_sms_sent.add_metric([smsc, "ocmgp://{}".format(smsc)], smsc_stats_by_id[smsc]['sms']['sent'])
+                metric_dlr_received.add_metric([smsc, "ocmgp://{}".format(smsc)], smsc_stats_by_id[smsc]['dlr']['received'])
+                metric_dlr_sent.add_metric([smsc, "ocmgp://{}".format(smsc)], smsc_stats_by_id[smsc]['dlr']['sent'])
 
             yield metric_failed
             yield metric_queued
@@ -369,8 +369,10 @@ if __name__ == '__main__':
                         datefmt="%Y-%m-%d %H:%M:%S")
     logger.setLevel(args.log_level)
 
+
     # get password
-    status_password = get_password(args.password, args.password_file)
+    status_password = "3AfLA8e.-ihxHM8B"
+    #status_password = get_password(args.password, args.password_file)
 
     REGISTRY.register(KannelCollector(args.target, status_password,
                                       args.filter_smsc,
