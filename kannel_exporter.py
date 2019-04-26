@@ -3,7 +3,7 @@
 """Prometheus custom collector for Kannel gateway
 https://github.com/apostvav/kannel_exporter"""
 
-__version__ = '0.2.4'
+__version__ = '0.3.0'
 
 import argparse
 import logging
@@ -12,7 +12,7 @@ import sys
 from urllib.request import urlopen
 from urllib.error import URLError
 from re import findall
-from collections import OrderedDict
+from collections import namedtuple, OrderedDict
 from wsgiref.simple_server import make_server
 from prometheus_client.core import GaugeMetricFamily, CounterMetricFamily
 from prometheus_client import REGISTRY, make_wsgi_app
@@ -56,15 +56,15 @@ def _xmlpostproc(path, key, value):
     return key, value
 
 
+CollectorOpts = namedtuple('CollectorOpts', ['filter_smsc', 'collect_wdp',
+                                             'collect_box_uptime', 'box_connections'])
+
+
 class KannelCollector:
-    def __init__(self, target, password, filter_smsc, box_connections,
-                 collect_wdp=False, collect_box_uptime=False):
+    def __init__(self, target, password, opts):
         self._target = target
         self._password = password
-        self._filter_smsc = filter_smsc
-        self._collect_wdp = collect_wdp
-        self._collect_box_uptime = collect_box_uptime
-        self._box_connections = box_connections
+        self._opts = opts
 
     def parse_kannel_status(self):
         url = self._target + "/status.xml?password=" + self._password
@@ -122,7 +122,7 @@ class KannelCollector:
 
         # WDP, SMS & DLR metrics
         message_type = ['sms', 'dlr']
-        if self._collect_wdp is True:
+        if self._opts.collect_wdp is True:
             message_type = ['wdp'] + message_type
 
         for type_ in message_type:
@@ -161,14 +161,14 @@ class KannelCollector:
                     yield metric
 
         # Box metrics
-        box_connections = {b: 0 for b in self._box_connections}
+        box_connections = {b: 0 for b in self._opts.box_connections}
         box_details = {}
         metric_box_connections = GaugeMetricFamily('bearerbox_box_connections',
                                                    'Number of box connections')
         metric_box_queue = GaugeMetricFamily('bearerbox_box_queue',
                                              'Number of messages in box queue')
 
-        if self._collect_box_uptime is True:
+        if self._opts.collect_box_uptime is True:
             metric_box_uptime = GaugeMetricFamily('bearerbox_box_uptime_seconds',
                                                   'Box uptime in seconds (*)')
         if response['gateway']['boxes'] != '':
@@ -201,7 +201,7 @@ class KannelCollector:
                 # In case of multiple boxes with same type, id and host.
                 # Only the uptime of the first occurence will be exposed
                 # in order to avoid duplicates.
-                if self._collect_box_uptime is True:
+                if self._opts.collect_box_uptime is True:
                     if tuplkey in box_details.keys():
                         if 'uptime' not in box_details[tuplkey].keys():
                             box_details[tuplkey]['uptime'] = uptime_to_secs(box['status'])
@@ -220,13 +220,13 @@ class KannelCollector:
                 metric_box_queue.add_sample('bearerbox_box_queue',
                                             value=value['queue'],
                                             labels=box_labels)
-            if self._collect_box_uptime is True:
+            if self._opts.collect_box_uptime is True:
                 metric_box_uptime.add_sample('bearerbox_box_uptime_seconds',
                                              value=value['uptime'],
                                              labels=box_labels)
 
         yield metric_box_queue
-        if self._collect_box_uptime is True:
+        if self._opts.collect_box_uptime is True:
             yield metric_box_uptime
 
         # SMSC metrics
@@ -237,7 +237,7 @@ class KannelCollector:
                           labels={})
         yield metric
 
-        if self._filter_smsc is False:
+        if self._opts.filter_smsc is False:
             metric_failed = CounterMetricFamily('bearerbox_smsc_failed_messages_total',
                                                 'Total number of SMSC failed messages',
                                                 labels=["smsc_id"])
@@ -370,11 +370,11 @@ def main():
     # get password
     status_password = get_password(args.password, args.password_file)
 
-    REGISTRY.register(KannelCollector(args.target, status_password,
-                                      args.filter_smsc,
-                                      args.box_connections,
-                                      args.collect_wdp,
-                                      args.collect_box_uptime))
+    # collector options
+    opts = CollectorOpts(args.filter_smsc, args.collect_wdp,
+                         args.collect_box_uptime, args.box_connections)
+
+    REGISTRY.register(KannelCollector(args.target, status_password, opts))
 
     app = make_wsgi_app()
     httpd = make_server('', args.port, app)

@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 
 import unittest
+import logging
 from kannel_exporter import KannelCollector, uptime_to_secs, bearerbox_version
-from kannel_exporter import get_password
+from kannel_exporter import get_password, CollectorOpts
+
+logging.basicConfig(level=logging.CRITICAL)
 
 
 class KannelCollectorTestCase(unittest.TestCase):
@@ -16,7 +19,8 @@ class KannelCollectorTestCase(unittest.TestCase):
         self.assertEqual(uptime3, 113)
 
     def test_kannel_collector(self):
-        exporter = KannelCollector('', '', False, ['wapbox', 'smsbox'])
+        opts = CollectorOpts(False, False, False, ['wapbox', 'smsbox'])
+        exporter = KannelCollector('', '', opts)
         self.assertEqual(exporter.parse_kannel_status(), None)
 
     def test_get_password(self):
