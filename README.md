@@ -6,6 +6,7 @@
 ```
 kannel_exporter.py [-h] [--target TARGET] [--port PORT]
                    [--filter-smscs] [--collect-wdp] [--collect-box-uptime]
+                   [--box-connection-types BOX_CONNECTIONS [BOX_CONNECTIONS ...]]
                    [--log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}] [-v]
                    [--password PASSWORD | --password-file PASSWORD_FILE]
 ```
@@ -75,4 +76,6 @@ systemctl enable kannel_exporter.service
 
 ## Contribute
 Any contribution is welcome. Feel free to open issues and pull requests.
-For any scraping issues you may have, please open an issue and attach the status xml file. Don't forget to strip any information you don't want to share.  
+
+For any scraping issues you may have, please open an issue and attach the status xml file.<br />
+Don't forget to strip any information that should not  be shared.  
