@@ -133,20 +133,32 @@ class KannelCollector:
                 if smscid in smsc_stats_by_id:
                     smsc_stats_by_id[smscid]['failed'] += int(smsc['failed'])
                     smsc_stats_by_id[smscid]['queued'] += int(smsc['queued'])
-                    smsc_stats_by_id[smscid]['sms']['received'] += int(smsc['sms']['received'])
-                    smsc_stats_by_id[smscid]['sms']['sent'] += int(smsc['sms']['sent'])
-                    smsc_stats_by_id[smscid]['dlr']['received'] += int(smsc['dlr']['received'])
-                    smsc_stats_by_id[smscid]['dlr']['sent'] += int(smsc['dlr']['sent'])
+                    if 'sms' not in smsc.keys():
+                        smsc_stats_by_id[smscid]['sms']['received'] += int(smsc['received']['sms'])
+                        smsc_stats_by_id[smscid]['sms']['sent'] += int(smsc['sent']['sms'])
+                        smsc_stats_by_id[smscid]['dlr']['received'] += int(smsc['received']['dlr'])
+                        smsc_stats_by_id[smscid]['dlr']['sent'] += int(smsc['sent']['dlr'])
+                    else:
+                        smsc_stats_by_id[smscid]['sms']['received'] += int(smsc['sms']['received'])
+                        smsc_stats_by_id[smscid]['sms']['sent'] += int(smsc['sms']['sent'])
+                        smsc_stats_by_id[smscid]['dlr']['received'] += int(smsc['dlr']['received'])
+                        smsc_stats_by_id[smscid]['dlr']['sent'] += int(smsc['dlr']['sent'])
                 else:
                     smsc_stats_by_id[smscid] = OrderedDict()
                     smsc_stats_by_id[smscid]['failed'] = int(smsc['failed'])
                     smsc_stats_by_id[smscid]['queued'] = int(smsc['queued'])
                     smsc_stats_by_id[smscid]['sms'] = OrderedDict()
-                    smsc_stats_by_id[smscid]['sms']['received'] = int(smsc['sms']['received'])
-                    smsc_stats_by_id[smscid]['sms']['sent'] = int(smsc['sms']['sent'])
                     smsc_stats_by_id[smscid]['dlr'] = OrderedDict()
-                    smsc_stats_by_id[smscid]['dlr']['received'] = int(smsc['dlr']['received'])
-                    smsc_stats_by_id[smscid]['dlr']['sent'] = int(smsc['dlr']['sent'])
+                    if 'sms' not in smsc.keys():
+                        smsc_stats_by_id[smscid]['sms']['received'] = int(smsc['received']['sms'])
+                        smsc_stats_by_id[smscid]['sms']['sent'] = int(smsc['sent']['sms'])
+                        smsc_stats_by_id[smscid]['dlr']['received'] = int(smsc['received']['dlr'])
+                        smsc_stats_by_id[smscid]['dlr']['sent'] = int(smsc['sent']['dlr'])
+                    else:
+                        smsc_stats_by_id[smscid]['sms']['received'] = int(smsc['sms']['received'])
+                        smsc_stats_by_id[smscid]['sms']['sent'] = int(smsc['sms']['sent'])
+                        smsc_stats_by_id[smscid]['dlr']['received'] = int(smsc['dlr']['received'])
+                        smsc_stats_by_id[smscid]['dlr']['sent'] = int(smsc['dlr']['sent'])
 
             for smsc in smsc_stats_by_id:
                 metrics['failed'].add_metric([smsc], smsc_stats_by_id[smsc]['failed'])
