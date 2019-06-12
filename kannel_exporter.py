@@ -91,6 +91,72 @@ class KannelCollector:
 
         return status
 
+    def _collect_smsc_stats(self, smsc_count, smsc_metrics):
+        # SMSC metrics
+        metrics = OrderedDict()
+        metrics['smsc_count'] = GaugeMetricFamily('bearerbox_smsc_connections',
+                                                  'Number of SMSC connections')
+        metrics['smsc_count'].add_sample('bearerbox_smsc_connections',
+                                         value=int(smsc_count),
+                                         labels={})
+
+        if self._opts.filter_smsc is False:
+            metrics['failed'] = CounterMetricFamily('bearerbox_smsc_failed_messages_total',
+                                                    'Total number of SMSC failed messages',
+                                                    labels=["smsc_id"])
+            metrics['queued'] = GaugeMetricFamily('bearerbox_smsc_queued_messages',
+                                                  'Number of SMSC queued messages',
+                                                  labels=["smsc_id"])
+            metrics['sms_received'] = CounterMetricFamily('bearerbox_smsc_received_sms_total',
+                                                          'Total number of received SMS by SMSC',
+                                                          labels=["smsc_id"])
+            metrics['sms_sent'] = CounterMetricFamily('bearerbox_smsc_sent_sms_total',
+                                                      'Total number of SMS sent to SMSC',
+                                                      labels=["smsc_id"])
+            metrics['dlr_received'] = CounterMetricFamily('bearerbox_smsc_received_dlr_total',
+                                                          'Total number of DLRs received by SMSC',
+                                                          labels=["smsc_id"])
+            metrics['dlr_sent'] = CounterMetricFamily('bearerbox_smsc_sent_dlr_total',
+                                                      'Total number of DLRs sent to SMSC',
+                                                      labels=["smsc_id"])
+
+            # when there's only one smsc connection on the gateway
+            # xmltodict returns an OrderedDict instead of a list of OrderedDicts
+            if not isinstance(smsc_metrics, list):
+                smsc_metrics = [smsc_metrics]
+
+            # Group SMSCs by smsc-id
+            smsc_stats_by_id = OrderedDict()
+
+            for smsc in smsc_metrics:
+                smscid = smsc['id']
+                if smscid in smsc_stats_by_id:
+                    smsc_stats_by_id[smscid]['failed'] += int(smsc['failed'])
+                    smsc_stats_by_id[smscid]['queued'] += int(smsc['queued'])
+                    smsc_stats_by_id[smscid]['sms']['received'] += int(smsc['sms']['received'])
+                    smsc_stats_by_id[smscid]['sms']['sent'] += int(smsc['sms']['sent'])
+                    smsc_stats_by_id[smscid]['dlr']['received'] += int(smsc['dlr']['received'])
+                    smsc_stats_by_id[smscid]['dlr']['sent'] += int(smsc['dlr']['sent'])
+                else:
+                    smsc_stats_by_id[smscid] = OrderedDict()
+                    smsc_stats_by_id[smscid]['failed'] = int(smsc['failed'])
+                    smsc_stats_by_id[smscid]['queued'] = int(smsc['queued'])
+                    smsc_stats_by_id[smscid]['sms'] = OrderedDict()
+                    smsc_stats_by_id[smscid]['sms']['received'] = int(smsc['sms']['received'])
+                    smsc_stats_by_id[smscid]['sms']['sent'] = int(smsc['sms']['sent'])
+                    smsc_stats_by_id[smscid]['dlr'] = OrderedDict()
+                    smsc_stats_by_id[smscid]['dlr']['received'] = int(smsc['dlr']['received'])
+                    smsc_stats_by_id[smscid]['dlr']['sent'] = int(smsc['dlr']['sent'])
+
+            for smsc in smsc_stats_by_id:
+                metrics['failed'].add_metric([smsc], smsc_stats_by_id[smsc]['failed'])
+                metrics['queued'].add_metric([smsc], smsc_stats_by_id[smsc]['queued'])
+                metrics['sms_received'].add_metric([smsc], smsc_stats_by_id[smsc]['sms']['received'])
+                metrics['sms_sent'].add_metric([smsc], smsc_stats_by_id[smsc]['sms']['sent'])
+                metrics['dlr_received'].add_metric([smsc], smsc_stats_by_id[smsc]['dlr']['received'])
+                metrics['dlr_sent'].add_metric([smsc], smsc_stats_by_id[smsc]['dlr']['sent'])
+        return metrics 
+
     def collect(self):
         # bearerbox server status
         metric = GaugeMetricFamily('bearerbox_up',
@@ -231,76 +297,10 @@ class KannelCollector:
             yield metric_box_uptime
 
         # SMSC metrics
-        metric = GaugeMetricFamily('bearerbox_smsc_connections',
-                                   'Number of SMSC connections')
-        metric.add_sample('bearerbox_smsc_connections',
-                          value=int(response['gateway']['smscs']['count']),
-                          labels={})
-        yield metric
-
-        if self._opts.filter_smsc is False:
-            metric_failed = CounterMetricFamily('bearerbox_smsc_failed_messages_total',
-                                                'Total number of SMSC failed messages',
-                                                labels=["smsc_id"])
-            metric_queued = GaugeMetricFamily('bearerbox_smsc_queued_messages',
-                                              'Number of SMSC queued messages',
-                                              labels=["smsc_id"])
-            metric_sms_received = CounterMetricFamily('bearerbox_smsc_received_sms_total',
-                                                      'Total number of received SMS by SMSC',
-                                                      labels=["smsc_id"])
-            metric_sms_sent = CounterMetricFamily('bearerbox_smsc_sent_sms_total',
-                                                  'Total number of SMS sent to SMSC',
-                                                  labels=["smsc_id"])
-            metric_dlr_received = CounterMetricFamily('bearerbox_smsc_received_dlr_total',
-                                                      'Total number of DLRs received by SMSC',
-                                                      labels=["smsc_id"])
-            metric_dlr_sent = CounterMetricFamily('bearerbox_smsc_sent_dlr_total',
-                                                  'Total number of DLRs sent to SMSC',
-                                                  labels=["smsc_id"])
-
-            # Group SMSCs by smsc-id
-            smsc_stats_by_id = OrderedDict()
-
-            # when there's only one smsc connection on the gateway
-            # xmltodict returns an OrderedDict instead of a list of OrderedDicts
-            if not isinstance(response['gateway']['smscs']['smsc'], list):
-                response['gateway']['smscs']['smsc'] = [response['gateway']['smscs']['smsc']]
-
-            for smsc in response['gateway']['smscs']['smsc']:
-                smscid = smsc['id']
-                if smscid in smsc_stats_by_id:
-                    smsc_stats_by_id[smscid]['failed'] += int(smsc['failed'])
-                    smsc_stats_by_id[smscid]['queued'] += int(smsc['queued'])
-                    smsc_stats_by_id[smscid]['sms']['received'] += int(smsc['sms']['received'])
-                    smsc_stats_by_id[smscid]['sms']['sent'] += int(smsc['sms']['sent'])
-                    smsc_stats_by_id[smscid]['dlr']['received'] += int(smsc['dlr']['received'])
-                    smsc_stats_by_id[smscid]['dlr']['sent'] += int(smsc['dlr']['sent'])
-                else:
-                    smsc_stats_by_id[smscid] = OrderedDict()
-                    smsc_stats_by_id[smscid]['failed'] = int(smsc['failed'])
-                    smsc_stats_by_id[smscid]['queued'] = int(smsc['queued'])
-                    smsc_stats_by_id[smscid]['sms'] = OrderedDict()
-                    smsc_stats_by_id[smscid]['sms']['received'] = int(smsc['sms']['received'])
-                    smsc_stats_by_id[smscid]['sms']['sent'] = int(smsc['sms']['sent'])
-                    smsc_stats_by_id[smscid]['dlr'] = OrderedDict()
-                    smsc_stats_by_id[smscid]['dlr']['received'] = int(smsc['dlr']['received'])
-                    smsc_stats_by_id[smscid]['dlr']['sent'] = int(smsc['dlr']['sent'])
-
-            for smsc in smsc_stats_by_id:
-                metric_failed.add_metric([smsc], smsc_stats_by_id[smsc]['failed'])
-                metric_queued.add_metric([smsc], smsc_stats_by_id[smsc]['queued'])
-                metric_sms_received.add_metric([smsc], smsc_stats_by_id[smsc]['sms']['received'])
-                metric_sms_sent.add_metric([smsc], smsc_stats_by_id[smsc]['sms']['sent'])
-                metric_dlr_received.add_metric([smsc], smsc_stats_by_id[smsc]['dlr']['received'])
-                metric_dlr_sent.add_metric([smsc], smsc_stats_by_id[smsc]['dlr']['sent'])
-
-            yield metric_failed
-            yield metric_queued
-            yield metric_sms_received
-            yield metric_sms_sent
-            yield metric_dlr_received
-            yield metric_dlr_sent
-
+        smsc_metrics = self._collect_smsc_stats(response['gateway']['smscs']['count'],
+                                                response['gateway']['smscs']['smsc'])
+        for metric in smsc_metrics.values():
+            yield metric
 
 def get_password(password, password_file):
     if password_file is not None:
