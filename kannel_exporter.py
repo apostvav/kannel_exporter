@@ -58,10 +58,11 @@ def _xmlpostproc(path, key, value):
 
 CollectorOpts = namedtuple('CollectorOpts', ['filter_smsc', 'collect_wdp',
                                              'collect_box_uptime', 'box_connections'])
+CollectorOpts.__new__.__defaults__ = (False, False, False, ['wapbox', 'smsbox'])
 
 
 class KannelCollector:
-    def __init__(self, target, password, opts):
+    def __init__(self, target, password, opts=CollectorOpts()):
         self._target = target
         self._password = password
         self._opts = opts
