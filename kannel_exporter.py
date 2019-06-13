@@ -91,8 +91,75 @@ class KannelCollector:
 
         return status
 
+    def _collect_box_stats(self, box_metrics):
+        metrics = OrderedDict()
+        box_connections = {b: 0 for b in self._opts.box_connections}
+        box_details = {}
+        metrics['box_connections'] = GaugeMetricFamily('bearerbox_box_connections',
+                                                       'Number of box connections')
+        metrics['box_queue'] = GaugeMetricFamily('bearerbox_box_queue',
+                                                 'Number of messages in box queue')
+                                             
+        if self._opts.collect_box_uptime is True:
+            metrics['box_uptime'] = GaugeMetricFamily('bearerbox_box_uptime_seconds',
+                                                      'Box uptime in seconds (*)')
+
+        if box_metrics != '':
+            # when there's only one box connected on the gateway
+            # xmltodict returns an OrderedDict instead of a list of OrderedDicts
+            if not isinstance(box_metrics['box'], list):
+                box_metrics['box'] = [box_metrics['box']]
+
+            for box in box_metrics['box']:
+                if box['type'] in box_connections.keys():
+                    box_connections[box['type']] += 1
+                else:
+                    box_connections[box['type']] = 1
+
+                # some type of boxes (e.g wapbox) don't have IDs.
+                if 'id' not in box.keys():
+                    box['id'] = ""
+
+                tuplkey = (box['type'], box['id'], box['IP'])
+
+                # some type of boxes (e.g wapbox) don't have queues.
+                if 'queue' in box.keys():
+                    if tuplkey in box_details.keys():
+                        box_details[tuplkey]['queue'] += int(box['queue'])
+                    else:
+                        box_details[tuplkey] = {}
+                        box_details[tuplkey]['queue'] = int(box['queue'])
+
+                # collect box uptime metrics
+                # In case of multiple boxes with same type, id and host.
+                # Only the uptime of the first occurence will be exposed
+                # in order to avoid duplicates.
+                if self._opts.collect_box_uptime is True:
+                    if tuplkey in box_details.keys():
+                        if 'uptime' not in box_details[tuplkey].keys():
+                            box_details[tuplkey]['uptime'] = uptime_to_secs(box['status'])
+                    else:
+                        box_details[tuplkey] = {}
+                        box_details[tuplkey]['uptime'] = uptime_to_secs(box['status'])
+
+        for key, value in box_connections.items():
+            metrics['box_connections'].add_sample('bearerbox_box_connections',
+                                                  value=value, labels={'type': key})
+
+        for key, value in box_details.items():
+            box_labels = {'type': key[0], 'id': key[1], 'ipaddr': key[2]}
+            if 'queue' in value.keys():
+                metrics['box_queue'].add_sample('bearerbox_box_queue',
+                                                value=value['queue'],
+                                                labels=box_labels)
+            if self._opts.collect_box_uptime is True:
+                metrics['box_uptime'].add_sample('bearerbox_box_uptime_seconds',
+                                                 value=value['uptime'],
+                                                 labels=box_labels)
+
+        return metrics
+
     def _collect_smsc_stats(self, smsc_count, smsc_metrics):
-        # SMSC metrics
         metrics = OrderedDict()
         metrics['smsc_count'] = GaugeMetricFamily('bearerbox_smsc_connections',
                                                   'Number of SMSC connections')
@@ -167,7 +234,8 @@ class KannelCollector:
                 metrics['sms_sent'].add_metric([smsc], smsc_stats_by_id[smsc]['sms']['sent'])
                 metrics['dlr_received'].add_metric([smsc], smsc_stats_by_id[smsc]['dlr']['received'])
                 metrics['dlr_sent'].add_metric([smsc], smsc_stats_by_id[smsc]['dlr']['sent'])
-        return metrics 
+
+        return metrics
 
     def collect(self):
         # bearerbox server status
@@ -240,79 +308,16 @@ class KannelCollector:
                     yield metric
 
         # Box metrics
-        box_connections = {b: 0 for b in self._opts.box_connections}
-        box_details = {}
-        metric_box_connections = GaugeMetricFamily('bearerbox_box_connections',
-                                                   'Number of box connections')
-        metric_box_queue = GaugeMetricFamily('bearerbox_box_queue',
-                                             'Number of messages in box queue')
-
-        if self._opts.collect_box_uptime is True:
-            metric_box_uptime = GaugeMetricFamily('bearerbox_box_uptime_seconds',
-                                                  'Box uptime in seconds (*)')
-        if response['gateway']['boxes'] != '':
-            # when there's only one box connected on the gateway
-            # xmltodict returns an OrderedDict instead of a list of OrderedDicts
-            if not isinstance(response['gateway']['boxes']['box'], list):
-                response['gateway']['boxes']['box'] = [response['gateway']['boxes']['box']]
-
-            for box in response['gateway']['boxes']['box']:
-                if box['type'] in box_connections.keys():
-                    box_connections[box['type']] += 1
-                else:
-                    box_connections[box['type']] = 1
-
-                # some type of boxes (e.g wapbox) don't have IDs.
-                if 'id' not in box.keys():
-                    box['id'] = ""
-
-                tuplkey = (box['type'], box['id'], box['IP'])
-
-                # some type of boxes (e.g wapbox) don't have queues.
-                if 'queue' in box.keys():
-                    if tuplkey in box_details.keys():
-                        box_details[tuplkey]['queue'] += int(box['queue'])
-                    else:
-                        box_details[tuplkey] = {}
-                        box_details[tuplkey]['queue'] = int(box['queue'])
-
-                # collect box uptime metrics
-                # In case of multiple boxes with same type, id and host.
-                # Only the uptime of the first occurence will be exposed
-                # in order to avoid duplicates.
-                if self._opts.collect_box_uptime is True:
-                    if tuplkey in box_details.keys():
-                        if 'uptime' not in box_details[tuplkey].keys():
-                            box_details[tuplkey]['uptime'] = uptime_to_secs(box['status'])
-                    else:
-                        box_details[tuplkey] = {}
-                        box_details[tuplkey]['uptime'] = uptime_to_secs(box['status'])
-
-        for key, value in box_connections.items():
-            metric_box_connections.add_sample('bearerbox_box_connections',
-                                              value=value, labels={'type': key})
-        yield metric_box_connections
-
-        for key, value in box_details.items():
-            box_labels = {'type': key[0], 'id': key[1], 'ipaddr': key[2]}
-            if 'queue' in value.keys():
-                metric_box_queue.add_sample('bearerbox_box_queue',
-                                            value=value['queue'],
-                                            labels=box_labels)
-            if self._opts.collect_box_uptime is True:
-                metric_box_uptime.add_sample('bearerbox_box_uptime_seconds',
-                                             value=value['uptime'],
-                                             labels=box_labels)
-
-        yield metric_box_queue
-        if self._opts.collect_box_uptime is True:
-            yield metric_box_uptime
+        metrics = self._collect_box_stats(response['gateway']['boxes'])
+        for metric in metrics.values():
+            yield metric
 
         # SMSC metrics
-        smsc_metrics = self._collect_smsc_stats(response['gateway']['smscs']['count'],
-                                                response['gateway']['smscs']['smsc'])
-        for metric in smsc_metrics.values():
+        metrics = self._collect_smsc_stats(response['gateway']['smscs']['count'],
+                                           response['gateway']['smscs']['smsc'])
+        for metric in metrics.values():
             yield metric
+
 
 def get_password(password, password_file):
     if password_file is not None:
