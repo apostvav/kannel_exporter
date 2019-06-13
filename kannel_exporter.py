@@ -91,6 +91,48 @@ class KannelCollector:
 
         return status
 
+    def _collect_msg_stats(self, gw_metrics):
+        metrics = OrderedDict()
+
+        message_type = ['sms', 'dlr']
+        if self._opts.collect_wdp is True:
+            message_type = ['wdp'] + message_type
+
+        for type_ in message_type:
+            for k, v in gw_metrics[type_].items():
+                if isinstance(v, dict):
+                    for k2, v2 in v.items():
+                        metric_name = 'bearerbox_{0}_{1}_{2}'.format(type_, k, k2)
+                        if k2 == 'total':
+                            metric_help = 'Total number of {0} {1}'.format(type_.upper(), k)
+                            metrics[metric_name] = CounterMetricFamily(metric_name, metric_help)
+                        else:
+                            metric_help = 'Number of {0} {1} in queue'.format(k, type_.upper())
+                            metrics[metric_name] = GaugeMetricFamily(metric_name, metric_help)
+
+                        metrics[metric_name].add_sample(metric_name, value=int(v2), labels={})
+
+                elif k not in ['inbound', 'outbound']:
+                    metric_name = 'bearerbox_{0}_{1}'.format(type_, k)
+                    metric_value = v
+                    metric_labels = {}
+
+                    if type_ == 'sms' and k == 'storesize':
+                        metric_help = 'Number of SMS in storesize'
+                    elif type_ == 'dlr':
+                        if k == 'queued':
+                            metric_help = 'Number of DLRs in queue'
+                        elif k == 'storage':
+                            metric_help = 'DLR storage type info'
+                            metric_value = 1
+                            metric_labels = {'storage': v}
+
+                    metrics[metric_name] = GaugeMetricFamily(metric_name, metric_help)
+                    metrics[metric_name].add_sample(metric_name, value=int(metric_value),
+                                                    labels=metric_labels)
+        
+        return metrics
+
     def _collect_box_stats(self, box_metrics):
         metrics = OrderedDict()
         box_connections = {b: 0 for b in self._opts.box_connections}
@@ -268,44 +310,9 @@ class KannelCollector:
         yield metric
 
         # WDP, SMS & DLR metrics
-        message_type = ['sms', 'dlr']
-        if self._opts.collect_wdp is True:
-            message_type = ['wdp'] + message_type
-
-        for type_ in message_type:
-            for k, v in response['gateway'][type_].items():
-                if isinstance(v, dict):
-                    for k2, v2 in v.items():
-                        metric_name = 'bearerbox_{0}_{1}_{2}'.format(type_, k, k2)
-                        if k2 == 'total':
-                            metric_help = 'Total number of {0} {1}'.format(type_.upper(), k)
-                            metric = CounterMetricFamily(metric_name, metric_help)
-                        else:
-                            metric_help = 'Number of {0} {1} in queue'.format(k, type_.upper())
-                            metric = GaugeMetricFamily(metric_name, metric_help)
-
-                        metric.add_sample(metric_name, value=int(v2), labels={})
-                        yield metric
-
-                elif k not in ['inbound', 'outbound']:
-                    metric_name = 'bearerbox_{0}_{1}'.format(type_, k)
-                    metric_value = v
-                    metric_labels = {}
-
-                    if type_ == 'sms' and k == 'storesize':
-                        metric_help = 'Number of SMS in storesize'
-                    elif type_ == 'dlr':
-                        if k == 'queued':
-                            metric_help = 'Number of DLRs in queue'
-                        elif k == 'storage':
-                            metric_help = 'DLR storage type info'
-                            metric_value = 1
-                            metric_labels = {'storage': v}
-
-                    metric = GaugeMetricFamily(metric_name, metric_help)
-                    metric.add_sample(metric_name, value=int(metric_value),
-                                      labels=metric_labels)
-                    yield metric
+        metrics = self._collect_msg_stats(response['gateway'])
+        for metric in metrics.values():
+            yield metric
 
         # Box metrics
         metrics = self._collect_box_stats(response['gateway']['boxes'])
