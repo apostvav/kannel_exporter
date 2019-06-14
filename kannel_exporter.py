@@ -3,7 +3,7 @@
 """Prometheus custom collector for Kannel gateway
 https://github.com/apostvav/kannel_exporter"""
 
-__version__ = '0.3.1'
+__version__ = '0.3.2'
 
 import argparse
 import logging
@@ -99,38 +99,38 @@ class KannelCollector:
             message_type = ['wdp'] + message_type
 
         for type_ in message_type:
-            for k, v in gw_metrics[type_].items():
-                if isinstance(v, dict):
-                    for k2, v2 in v.items():
-                        metric_name = 'bearerbox_{0}_{1}_{2}'.format(type_, k, k2)
-                        if k2 == 'total':
-                            metric_help = 'Total number of {0} {1}'.format(type_.upper(), k)
+            for key, value in gw_metrics[type_].items():
+                if isinstance(value, dict):
+                    for key2, value2 in value.items():
+                        metric_name = 'bearerbox_{0}_{1}_{2}'.format(type_, key, key2)
+                        if key2 == 'total':
+                            metric_help = 'Total number of {0} {1}'.format(type_.upper(), key)
                             metrics[metric_name] = CounterMetricFamily(metric_name, metric_help)
                         else:
-                            metric_help = 'Number of {0} {1} in queue'.format(k, type_.upper())
+                            metric_help = 'Number of {0} {1} in queue'.format(key, type_.upper())
                             metrics[metric_name] = GaugeMetricFamily(metric_name, metric_help)
 
-                        metrics[metric_name].add_sample(metric_name, value=int(v2), labels={})
+                        metrics[metric_name].add_sample(metric_name, value=int(value2), labels={})
 
-                elif k not in ['inbound', 'outbound']:
-                    metric_name = 'bearerbox_{0}_{1}'.format(type_, k)
-                    metric_value = v
+                elif key not in ['inbound', 'outbound']:
+                    metric_name = 'bearerbox_{0}_{1}'.format(type_, key)
+                    metric_value = value
                     metric_labels = {}
 
-                    if type_ == 'sms' and k == 'storesize':
+                    if type_ == 'sms' and key == 'storesize':
                         metric_help = 'Number of SMS in storesize'
                     elif type_ == 'dlr':
-                        if k == 'queued':
+                        if key == 'queued':
                             metric_help = 'Number of DLRs in queue'
-                        elif k == 'storage':
+                        elif key == 'storage':
                             metric_help = 'DLR storage type info'
                             metric_value = 1
-                            metric_labels = {'storage': v}
+                            metric_labels = {'storage': value}
 
                     metrics[metric_name] = GaugeMetricFamily(metric_name, metric_help)
                     metrics[metric_name].add_sample(metric_name, value=int(metric_value),
                                                     labels=metric_labels)
-        
+
         return metrics
 
     def _collect_box_stats(self, box_metrics):
@@ -141,7 +141,7 @@ class KannelCollector:
                                                        'Number of box connections')
         metrics['box_queue'] = GaugeMetricFamily('bearerbox_box_queue',
                                                  'Number of messages in box queue')
-                                             
+
         if self._opts.collect_box_uptime is True:
             metrics['box_uptime'] = GaugeMetricFamily('bearerbox_box_uptime_seconds',
                                                       'Box uptime in seconds (*)')
@@ -153,10 +153,7 @@ class KannelCollector:
                 box_metrics['box'] = [box_metrics['box']]
 
             for box in box_metrics['box']:
-                if box['type'] in box_connections.keys():
-                    box_connections[box['type']] += 1
-                else:
-                    box_connections[box['type']] = 1
+                box_connections[box['type']] = box_connections.get(box['type'], 0) + 1
 
                 # some type of boxes (e.g wapbox) don't have IDs.
                 if 'id' not in box.keys():
@@ -166,11 +163,10 @@ class KannelCollector:
 
                 # some type of boxes (e.g wapbox) don't have queues.
                 if 'queue' in box.keys():
-                    if tuplkey in box_details.keys():
-                        box_details[tuplkey]['queue'] += int(box['queue'])
-                    else:
+                    if tuplkey not in box_details.keys():
                         box_details[tuplkey] = {}
-                        box_details[tuplkey]['queue'] = int(box['queue'])
+                    box_details[tuplkey]['queue'] = (box_details[tuplkey].get('queue', 0)
+                                                     + int(box['queue']))
 
                 # collect box uptime metrics
                 # In case of multiple boxes with same type, id and host.
@@ -234,48 +230,46 @@ class KannelCollector:
             if not isinstance(smsc_metrics, list):
                 smsc_metrics = [smsc_metrics]
 
-            # Group SMSCs by smsc-id
-            smsc_stats_by_id = OrderedDict()
+            # Group SMSC metrics by smsc-id
+            aggreg = OrderedDict()
 
             for smsc in smsc_metrics:
                 smscid = smsc['id']
-                if smscid in smsc_stats_by_id:
-                    smsc_stats_by_id[smscid]['failed'] += int(smsc['failed'])
-                    smsc_stats_by_id[smscid]['queued'] += int(smsc['queued'])
-                    if 'sms' not in smsc.keys():
-                        smsc_stats_by_id[smscid]['sms']['received'] += int(smsc['received']['sms'])
-                        smsc_stats_by_id[smscid]['sms']['sent'] += int(smsc['sent']['sms'])
-                        smsc_stats_by_id[smscid]['dlr']['received'] += int(smsc['received']['dlr'])
-                        smsc_stats_by_id[smscid]['dlr']['sent'] += int(smsc['sent']['dlr'])
-                    else:
-                        smsc_stats_by_id[smscid]['sms']['received'] += int(smsc['sms']['received'])
-                        smsc_stats_by_id[smscid]['sms']['sent'] += int(smsc['sms']['sent'])
-                        smsc_stats_by_id[smscid]['dlr']['received'] += int(smsc['dlr']['received'])
-                        smsc_stats_by_id[smscid]['dlr']['sent'] += int(smsc['dlr']['sent'])
-                else:
-                    smsc_stats_by_id[smscid] = OrderedDict()
-                    smsc_stats_by_id[smscid]['failed'] = int(smsc['failed'])
-                    smsc_stats_by_id[smscid]['queued'] = int(smsc['queued'])
-                    smsc_stats_by_id[smscid]['sms'] = OrderedDict()
-                    smsc_stats_by_id[smscid]['dlr'] = OrderedDict()
-                    if 'sms' not in smsc.keys():
-                        smsc_stats_by_id[smscid]['sms']['received'] = int(smsc['received']['sms'])
-                        smsc_stats_by_id[smscid]['sms']['sent'] = int(smsc['sent']['sms'])
-                        smsc_stats_by_id[smscid]['dlr']['received'] = int(smsc['received']['dlr'])
-                        smsc_stats_by_id[smscid]['dlr']['sent'] = int(smsc['sent']['dlr'])
-                    else:
-                        smsc_stats_by_id[smscid]['sms']['received'] = int(smsc['sms']['received'])
-                        smsc_stats_by_id[smscid]['sms']['sent'] = int(smsc['sms']['sent'])
-                        smsc_stats_by_id[smscid]['dlr']['received'] = int(smsc['dlr']['received'])
-                        smsc_stats_by_id[smscid]['dlr']['sent'] = int(smsc['dlr']['sent'])
 
-            for smsc in smsc_stats_by_id:
-                metrics['failed'].add_metric([smsc], smsc_stats_by_id[smsc]['failed'])
-                metrics['queued'].add_metric([smsc], smsc_stats_by_id[smsc]['queued'])
-                metrics['sms_received'].add_metric([smsc], smsc_stats_by_id[smsc]['sms']['received'])
-                metrics['sms_sent'].add_metric([smsc], smsc_stats_by_id[smsc]['sms']['sent'])
-                metrics['dlr_received'].add_metric([smsc], smsc_stats_by_id[smsc]['dlr']['received'])
-                metrics['dlr_sent'].add_metric([smsc], smsc_stats_by_id[smsc]['dlr']['sent'])
+                if smscid not in aggreg:
+                    aggreg[smscid] = OrderedDict()
+                    aggreg[smscid]['sms'] = OrderedDict()
+                    aggreg[smscid]['dlr'] = OrderedDict()
+
+                aggreg[smscid]['failed'] = aggreg[smscid].get('failed', 0) + int(smsc['failed'])
+                aggreg[smscid]['queued'] = aggreg[smscid].get('queued', 0) + int(smsc['queued'])
+
+                if 'sms' not in smsc.keys():
+                    aggreg[smscid]['sms']['received'] = (aggreg[smscid]['sms'].get('received', 0)
+                                                         + int(smsc['received']['sms']))
+                    aggreg[smscid]['sms']['sent'] = (aggreg[smscid]['sms'].get('sent', 0)
+                                                     + int(smsc['sent']['sms']))
+                    aggreg[smscid]['dlr']['received'] = (aggreg[smscid]['dlr'].get('received', 0)
+                                                         + int(smsc['received']['dlr']))
+                    aggreg[smscid]['dlr']['sent'] = (aggreg[smscid]['dlr'].get('sent', 0)
+                                                     + int(smsc['sent']['dlr']))
+                else:
+                    aggreg[smscid]['sms']['received'] = (aggreg[smscid]['sms'].get('received', 0)
+                                                         + int(smsc['sms']['received']))
+                    aggreg[smscid]['sms']['sent'] = (aggreg[smscid]['sms'].get('sent', 0)
+                                                     + int(smsc['sms']['sent']))
+                    aggreg[smscid]['dlr']['received'] = (aggreg[smscid]['dlr'].get('received', 0)
+                                                         + int(smsc['dlr']['received']))
+                    aggreg[smscid]['dlr']['sent'] = (aggreg[smscid]['dlr'].get('sent', 0)
+                                                     + int(smsc['dlr']['sent']))
+
+            for smsc in aggreg:
+                metrics['failed'].add_metric([smsc], aggreg[smsc]['failed'])
+                metrics['queued'].add_metric([smsc], aggreg[smsc]['queued'])
+                metrics['sms_received'].add_metric([smsc], aggreg[smsc]['sms']['received'])
+                metrics['sms_sent'].add_metric([smsc], aggreg[smsc]['sms']['sent'])
+                metrics['dlr_received'].add_metric([smsc], aggreg[smsc]['dlr']['received'])
+                metrics['dlr_sent'].add_metric([smsc], aggreg[smsc]['dlr']['sent'])
 
         return metrics
 
