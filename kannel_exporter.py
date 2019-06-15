@@ -244,6 +244,7 @@ class KannelCollector:
                 aggreg[smscid]['failed'] = aggreg[smscid].get('failed', 0) + int(smsc['failed'])
                 aggreg[smscid]['queued'] = aggreg[smscid].get('queued', 0) + int(smsc['queued'])
 
+                # kannel 1.5 exposes metrics in a different format
                 if 'sms' not in smsc.keys():
                     aggreg[smscid]['sms']['received'] = (aggreg[smscid]['sms'].get('received', 0)
                                                          + int(smsc['received']['sms']))
