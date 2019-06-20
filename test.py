@@ -23,6 +23,18 @@ class KannelCollectorTestCase(unittest.TestCase):
         exporter = KannelCollector('', '', opts)
         self.assertEqual(exporter.parse_kannel_status(), None)
 
+    def test_collector_opts(self):
+        opts_def = CollectorOpts()
+        opts_nondef = CollectorOpts(True, True, False, ['smsbox'])
+        self.assertEqual(opts_def.filter_smsc, False)
+        self.assertEqual(opts_def.collect_wdp, False)
+        self.assertEqual(opts_def.collect_box_uptime, False)
+        self.assertEqual(opts_def.box_connections, ['wapbox', 'smsbox'])
+        self.assertEqual(opts_nondef.filter_smsc, True)
+        self.assertEqual(opts_nondef.collect_wdp, True)
+        self.assertEqual(opts_nondef.collect_box_uptime, False)
+        self.assertEqual(opts_nondef.box_connections, ['smsbox'])
+
     def test_get_password(self):
         password = get_password('mypass', None)
         self.assertEqual(password, 'mypass')
