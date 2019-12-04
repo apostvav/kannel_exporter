@@ -2,6 +2,8 @@
 
 [Kannel](http://www.kannel.org) exporter for [Prometheus](https://prometheus.io). Exposes metrics collected from the kannel status page.
 
+Works with Kannel 1.4.4 or greater.
+
 :warning: Consider disabling smsc metrics collection by using the `--filter-smscs` flag or by dropping metrics on Prometheus server. On big setups, high cardinality metrics will be produced.
 
 ## Usage

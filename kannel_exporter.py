@@ -91,7 +91,7 @@ class KannelCollector:
 
         return status
 
-    def _collect_msg_stats(self, gw_metrics):
+    def collect_msg_stats(self, gw_metrics):
         metrics = OrderedDict()
 
         message_type = ['sms', 'dlr']
@@ -133,7 +133,7 @@ class KannelCollector:
 
         return metrics
 
-    def _collect_box_stats(self, box_metrics):
+    def collect_box_stats(self, box_metrics):
         metrics = OrderedDict()
         box_connections = {b: 0 for b in self._opts.box_connections}
         box_details = {}
@@ -197,7 +197,7 @@ class KannelCollector:
 
         return metrics
 
-    def _collect_smsc_stats(self, smsc_count, smsc_metrics):
+    def collect_smsc_stats(self, smsc_count, smsc_metrics):
         metrics = OrderedDict()
         metrics['smsc_count'] = GaugeMetricFamily('bearerbox_smsc_connections',
                                                   'Number of SMSC connections')
@@ -305,17 +305,17 @@ class KannelCollector:
         yield metric
 
         # WDP, SMS & DLR metrics
-        metrics = self._collect_msg_stats(response['gateway'])
+        metrics = self.collect_msg_stats(response['gateway'])
         for metric in metrics.values():
             yield metric
 
         # Box metrics
-        metrics = self._collect_box_stats(response['gateway']['boxes'])
+        metrics = self.collect_box_stats(response['gateway']['boxes'])
         for metric in metrics.values():
             yield metric
 
         # SMSC metrics
-        metrics = self._collect_smsc_stats(response['gateway']['smscs']['count'],
+        metrics = self.collect_smsc_stats(response['gateway']['smscs']['count'],
                                            response['gateway']['smscs']['smsc'])
         for metric in metrics.values():
             yield metric
@@ -352,7 +352,7 @@ def cli():
                         action='store_true', help='Collect boxes uptime metrics')
     parser.add_argument('--box-connection-types', dest='box_connections',
                         nargs='+', default=['wapbox', 'smsbox'],
-                        help='List of box connection types. (default wapbox, smsbox')
+                        help='List of box connection types. (default wapbox, smsbox)')
     parser.add_argument('--log-level', dest='log_level', default='WARNING',
                         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
                         help='Define the logging level')

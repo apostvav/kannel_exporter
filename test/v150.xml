@@ -1,0 +1,94 @@
+<?xml version="1.0"?>
+<gateway>
+<version>Kannel bearerbox version `1.5.0'.</version>
+<status>running, uptime 0d 1h 3m 2s</status>
+	<wdp>
+		<received><total>0</total><queued>0</queued></received>
+		<sent><total>0</total><queued>0</queued></sent>
+	</wdp>
+	<sms>
+		<received><total>10</total><queued>5</queued></received>
+		<sent><total>30</total><queued>3</queued></sent>
+		<storesize>0</storesize>
+		<inbound>0.00,0.00,0.00</inbound>
+		<outbound>0.00,0.00,0.00</outbound>
+		</sms>
+	<dlr>
+		<received><total>60</total></received>
+		<sent><total>24</total></sent>
+		<inbound>0.00,0.00,0.00</inbound>
+		<outbound>0.00,0.00,0.00</outbound>
+		<queued>14</queued>
+		<storage>mysql</storage>
+	</dlr>
+<boxes>
+	<box>
+		<type>smsbox</type>
+		<id>smsbox</id>
+		<IP>127.0.0.1</IP>
+		<queue>7</queue>
+		<status>on-line 0d 1h 3m 0s</status>
+		<ssl>no</ssl>
+	</box>
+	<box>
+		<type>sqlbox</type>
+		<id>sqlbox</id>
+		<IP>127.0.0.1</IP>
+		<queue>10</queue>
+		<status>on-line 0d 0h 59m 5s</status>
+		<ssl>no</ssl>
+    </box>
+</boxes>
+<smscs><count>5</count>
+	<smsc>
+		<name>FAKE:20001</name>
+		<admin-id>fakesmsc</admin-id>
+		<id>fakesmsc</id>
+		<status>online 178s</status>
+		<received><sms>0</sms><dlr>30</dlr></received>
+		<sent><sms>15</sms><dlr>0</dlr></sent>
+		<failed>3</failed>
+		<queued>1</queued>
+	</smsc>
+<smsc>
+		<name>HTTP:generic</name>
+		<admin-id>httpsmsc</admin-id>
+		<id>httpsmsc</id>
+		<status>online 41s</status>
+		<received><sms>7</sms><dlr>20</dlr></received>
+		<sent><sms>10</sms><dlr>16</dlr></sent>
+		<failed>4</failed>
+		<queued>3</queued>
+	</smsc>
+<smsc>
+		<name>SMPP:example.com:8000/8000:user1:VMA</name>
+		<admin-id>smpp1</admin-id>
+		<id>smpp1</id>
+		<status>connecting</status>
+		<received><sms>2</sms><dlr>6</dlr></received>
+		<sent><sms>3</sms><dlr>5</dlr></sent>
+		<failed>8</failed>
+		<queued>2</queued>
+	</smsc>
+<smsc>
+		<name>SMPP:example.net:8000/0:user2:VMA</name>
+		<admin-id>smpp2</admin-id>
+		<id>smpp2</id>
+		<status>connecting</status>
+		<received><sms>0</sms><dlr>0</dlr></received>
+		<sent><sms>2</sms><dlr>3</dlr></sent>
+		<failed>1</failed>
+		<queued>2</queued>
+	</smsc>
+<smsc>
+		<name>SMPP:example.net:0/8000:user2:VMA</name>
+		<admin-id>smpp2</admin-id>
+		<id>smpp2</id>
+		<status>connecting</status>
+		<received><sms>1</sms><dlr>4</dlr></received>
+		<sent><sms>0</sms><dlr>0</dlr></sent>
+		<failed>1</failed>
+		<queued>3</queued>
+	</smsc>
+</smscs>
+</gateway>
