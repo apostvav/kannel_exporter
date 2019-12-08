@@ -3,7 +3,7 @@
 """Prometheus custom collector for Kannel gateway
 https://github.com/apostvav/kannel_exporter"""
 
-__version__ = '0.3.2'
+__version__ = '0.3.3'
 
 import argparse
 import logging
@@ -19,7 +19,7 @@ from prometheus_client import REGISTRY, make_wsgi_app
 import xmltodict
 
 # logger
-logger = logging.getLogger('kannel_exporter')
+logger = logging.getLogger('kannel_exporter')  # pylint: disable=invalid-name
 
 
 def uptime_to_secs(uptime):
@@ -50,7 +50,7 @@ def bearerbox_version(version):
     return version
 
 
-def _xmlpostproc(path, key, value):
+def _xmlpostproc(path, key, value):  # pylint: disable=unused-argument
     if value is None:
         value = ""
     return key, value
@@ -133,6 +133,19 @@ class KannelCollector:
 
         return metrics
 
+    @staticmethod
+    def _collect_box_uptime(box_details, box, tuplkey):
+        # Helper method to collect box uptime metrics.
+        # In case of multiple boxes with same type, id and host,
+        # only the uptime of the first occurence will be exposed
+        # in order to avoid duplicates.
+        if tuplkey in box_details.keys():
+            if 'uptime' not in box_details[tuplkey].keys():
+                box_details[tuplkey]['uptime'] = uptime_to_secs(box['status'])
+        else:
+            box_details[tuplkey] = {}
+            box_details[tuplkey]['uptime'] = uptime_to_secs(box['status'])
+
     def collect_box_stats(self, box_metrics):
         metrics = OrderedDict()
         box_connections = {b: 0 for b in self._opts.box_connections}
@@ -156,8 +169,7 @@ class KannelCollector:
                 box_connections[box['type']] = box_connections.get(box['type'], 0) + 1
 
                 # some type of boxes (e.g wapbox) don't have IDs.
-                if 'id' not in box.keys():
-                    box['id'] = ""
+                box['id'] = box.get('id', "")
 
                 tuplkey = (box['type'], box['id'], box['IP'])
 
@@ -169,16 +181,8 @@ class KannelCollector:
                                                      + int(box['queue']))
 
                 # collect box uptime metrics
-                # In case of multiple boxes with same type, id and host.
-                # Only the uptime of the first occurence will be exposed
-                # in order to avoid duplicates.
                 if self._opts.collect_box_uptime is True:
-                    if tuplkey in box_details.keys():
-                        if 'uptime' not in box_details[tuplkey].keys():
-                            box_details[tuplkey]['uptime'] = uptime_to_secs(box['status'])
-                    else:
-                        box_details[tuplkey] = {}
-                        box_details[tuplkey]['uptime'] = uptime_to_secs(box['status'])
+                    self._collect_box_uptime(box_details, box, tuplkey)
 
         for key, value in box_connections.items():
             metrics['box_connections'].add_sample('bearerbox_box_connections',
@@ -205,7 +209,7 @@ class KannelCollector:
                                          value=int(smsc_count),
                                          labels={})
 
-        if self._opts.filter_smsc is False:
+        if not self._opts.filter_smsc:
             metrics['failed'] = CounterMetricFamily('bearerbox_smsc_failed_messages_total',
                                                     'Total number of SMSC failed messages',
                                                     labels=["smsc_id"])
@@ -274,7 +278,7 @@ class KannelCollector:
 
         return metrics
 
-    def collect(self):
+    def collect(self):  # pylint: disable=inconsistent-return-statements
         # bearerbox server status
         metric = GaugeMetricFamily('bearerbox_up',
                                    'Could the bearerbox server be reached')
@@ -316,7 +320,7 @@ class KannelCollector:
 
         # SMSC metrics
         metrics = self.collect_smsc_stats(response['gateway']['smscs']['count'],
-                                           response['gateway']['smscs']['smsc'])
+                                          response['gateway']['smscs']['smsc'])
         for metric in metrics.values():
             yield metric
 
@@ -324,8 +328,8 @@ class KannelCollector:
 def get_password(password, password_file):
     if password_file is not None:
         try:
-            with open(password_file) as fd:
-                status_password = fd.read().strip()
+            with open(password_file) as pass_file:
+                status_password = pass_file.read().strip()
         except OSError as err:
             sys.exit("Failed to open file {0}.\n{1}".format(password_file, err))
         except UnicodeError as err:
