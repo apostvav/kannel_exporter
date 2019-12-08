@@ -115,7 +115,8 @@ Using native malloc."""
 
     def test_box_metrics(self):
         # bearerbox_box_connections Number of box connections
-        exporter = KannelCollector('', '')
+        opts = CollectorOpts(collect_box_uptime=True)
+        exporter = KannelCollector('', '', opts)
         metrics = exporter.collect_box_stats(self.status150['gateway']['boxes'])
         self.assertEqual(metrics['box_connections'].documentation,
                          'Number of box connections')
@@ -125,6 +126,9 @@ Using native malloc."""
         self.assertEqual(metrics['box_connections'].samples[1].labels['type'], 'smsbox')
         self.assertEqual(metrics['box_connections'].samples[2].value, 1)
         self.assertEqual(metrics['box_connections'].samples[2].labels['type'], 'sqlbox')
+        self.assertEqual(metrics['box_uptime'].documentation, 'Box uptime in seconds (*)')
+        self.assertEqual(metrics['box_uptime'].samples[0].value, 3780)
+        self.assertEqual(metrics['box_uptime'].samples[1].value, 3545)
         self.assertEqual(metrics['box_queue'].documentation, 'Number of messages in box queue')
         self.assertEqual(metrics['box_queue'].samples[0].value, 7)
         self.assertEqual(metrics['box_queue'].samples[1].value, 10)
