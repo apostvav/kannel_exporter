@@ -1,5 +1,9 @@
 # Kannel Exporter
 
+<p align="left">
+  <a href="https://github.com/apostvav/kannel_exporter"><img alt="GitHub Actions status" src="https://github.com/apostvav/kannel_exporter/workflows/Python%20package/badge.svg"></a>
+</p>
+
 [Kannel](http://www.kannel.org) exporter for [Prometheus](https://prometheus.io). Exposes metrics collected from the kannel status page.
 
 Works with Kannel 1.4.4 or greater.
