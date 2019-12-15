@@ -1,0 +1,35 @@
+name: Docker Image CI
+
+on:
+  push:
+    tags:
+      - v*
+
+jobs:
+
+  push:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    
+    - name: Build image
+      run: |
+        # Get version from git reference
+        VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
+        
+        # Strip 'v' prefix from tag name
+        VERSION=$(echo $VERSION | sed -e 's/^v//')
+        
+        docker build . --file Dockerfile --tag ${{ github.actor }}/kannel_exporter:$VERSION
+        docker tag ${{ github.actor }}/kannel_exporter:$VERSION ${{ github.actor }}/kannel_exporter:latest
+
+    - name: Login
+      run: echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login --username=${{ github.actor }} --password-stdin
+
+    - name: Push
+      run: docker push ${{ github.actor }}/kannel_exporter
+
+    - name: Logout
+      run: docker logout
