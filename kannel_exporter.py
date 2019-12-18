@@ -137,11 +137,13 @@ class KannelCollector:
     def _collect_box_uptime(box_details, box, tuplkey):
         # Helper method to collect box uptime metrics.
         # In case of multiple boxes with same type, id and host,
-        # only the uptime of the first occurence will be exposed
-        # in order to avoid duplicates.
-        if tuplkey in box_details.keys():
-            if 'uptime' not in box_details[tuplkey].keys():
-                box_details[tuplkey]['uptime'] = uptime_to_secs(box['status'])
+        # only the lowest uptime value be exposed in order to avoid duplicates.
+        uptime = uptime_to_secs(box['status'])
+
+        if tuplkey in box_details:
+            if ('uptime' not in box_details[tuplkey] or
+                    uptime < box_details[tuplkey]['uptime']):
+                box_details[tuplkey]['uptime'] = uptime
         else:
             box_details[tuplkey] = {}
             box_details[tuplkey]['uptime'] = uptime_to_secs(box['status'])
