@@ -23,9 +23,11 @@ class KannelCollectorTestCase(unittest.TestCase):
         uptime1 = uptime_to_secs("running, uptime 0d 1h 16m 31s")
         uptime2 = uptime_to_secs("running, uptime 0d 0h 1m 38s")
         uptime3 = uptime_to_secs("on-line 0d 0h 1m 53s")
+        uptime4 = uptime_to_secs("connecting")
         self.assertEqual(uptime1, 4591)
         self.assertEqual(uptime2, 98)
         self.assertEqual(uptime3, 113)
+        self.assertEqual(uptime4, 0)
 
     def test_kannel_collector(self):
         exporter = KannelCollector('', '')
@@ -33,7 +35,7 @@ class KannelCollectorTestCase(unittest.TestCase):
 
     def test_collector_opts(self):
         opts_def = CollectorOpts()
-        opts_nondef = CollectorOpts(True, True, False, ['smsbox'])
+        opts_nondef = CollectorOpts(True, True, False, False, ['smsbox'])
         self.assertEqual(opts_def.filter_smsc, False)
         self.assertEqual(opts_def.collect_wdp, False)
         self.assertEqual(opts_def.collect_box_uptime, False)

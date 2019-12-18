@@ -24,6 +24,10 @@ logger = logging.getLogger('kannel_exporter')  # pylint: disable=invalid-name
 
 def uptime_to_secs(uptime):
     uptime = findall(r'\d+', uptime)
+
+    if not uptime:
+        return 0
+
     days_in_secs = int(uptime[0]) * 86400
     hours_in_secs = int(uptime[1]) * 3600
     minutes_in_secs = int(uptime[2]) * 60
@@ -57,8 +61,9 @@ def _xmlpostproc(path, key, value):  # pylint: disable=unused-argument
 
 
 CollectorOpts = namedtuple('CollectorOpts', ['filter_smsc', 'collect_wdp',
-                                             'collect_box_uptime', 'box_connections'])
-CollectorOpts.__new__.__defaults__ = (False, False, False, ['wapbox', 'smsbox'])
+                                             'collect_box_uptime', 'collect_smsc_uptime',
+                                             'box_connections'])
+CollectorOpts.__new__.__defaults__ = (False, False, False, False, ['wapbox', 'smsbox'])
 
 
 class KannelCollector:
@@ -137,7 +142,7 @@ class KannelCollector:
     def _collect_box_uptime(box_details, box, tuplkey):
         # Helper method to collect box uptime metrics.
         # In case of multiple boxes with same type, id and host,
-        # only the lowest uptime value be exposed in order to avoid duplicates.
+        # only the lowest uptime value will be exposed in order to avoid duplicates.
         uptime = uptime_to_secs(box['status'])
 
         if tuplkey in box_details:
@@ -147,6 +152,18 @@ class KannelCollector:
         else:
             box_details[tuplkey] = {}
             box_details[tuplkey]['uptime'] = uptime_to_secs(box['status'])
+
+    @staticmethod
+    def _collect_smsc_uptime(smsc_details, uptime):
+        # Helper method to collect smsc uptime metrics.
+        # For multiple smscs with the same id,
+        # only the lowest uptime value will be exposed.
+        uptime = uptime_to_secs(uptime)
+
+        if 'uptime' not in smsc_details or uptime < smsc_details['uptime']:
+            return uptime
+
+        return smsc_details['uptime']
 
     def collect_box_stats(self, box_metrics):
         metrics = OrderedDict()
@@ -230,6 +247,10 @@ class KannelCollector:
             metrics['dlr_sent'] = CounterMetricFamily('bearerbox_smsc_sent_dlr_total',
                                                       'Total number of DLRs sent to SMSC',
                                                       labels=["smsc_id"])
+            if self._opts.collect_smsc_uptime is True:
+                metrics['uptime'] = GaugeMetricFamily('bearerbox_smsc_uptime_seconds',
+                                                      'SMSC uptime in seconds (*)',
+                                                      labels=["smsc_id"])
 
             # when there's only one smsc connection on the gateway
             # xmltodict returns an OrderedDict instead of a list of OrderedDicts
@@ -249,6 +270,8 @@ class KannelCollector:
 
                 aggreg[smscid]['failed'] = aggreg[smscid].get('failed', 0) + int(smsc['failed'])
                 aggreg[smscid]['queued'] = aggreg[smscid].get('queued', 0) + int(smsc['queued'])
+                if self._opts.collect_smsc_uptime is True:
+                    aggreg[smscid]['uptime'] = self._collect_smsc_uptime(aggreg[smscid], smsc['status'])
 
                 # kannel 1.5 exposes metrics in a different format
                 if 'sms' not in smsc.keys():
@@ -277,6 +300,8 @@ class KannelCollector:
                 metrics['sms_sent'].add_metric([smsc], aggreg[smsc]['sms']['sent'])
                 metrics['dlr_received'].add_metric([smsc], aggreg[smsc]['dlr']['received'])
                 metrics['dlr_sent'].add_metric([smsc], aggreg[smsc]['dlr']['sent'])
+                if self._opts.collect_smsc_uptime is True:
+                    metrics['uptime'].add_metric([smsc], aggreg[smsc]['uptime'])
 
         return metrics
 
@@ -356,6 +381,8 @@ def cli():
                         help='Collect WDP metrics.')
     parser.add_argument('--collect-box-uptime', dest='collect_box_uptime',
                         action='store_true', help='Collect boxes uptime metrics')
+    parser.add_argument('--collect-smsc-uptime', dest='collect_smsc_uptime',
+                        action='store_true', help='Collect smsc uptime metrics')
     parser.add_argument('--box-connection-types', dest='box_connections',
                         nargs='+', default=['wapbox', 'smsbox'],
                         help='List of box connection types. (default wapbox, smsbox)')
