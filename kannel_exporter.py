@@ -193,8 +193,8 @@ class KannelCollector:
                 tuplkey = (box['type'], box['id'], box['IP'])
 
                 # some type of boxes (e.g wapbox) don't have queues.
-                if 'queue' in box.keys():
-                    if tuplkey not in box_details.keys():
+                if 'queue' in box:
+                    if tuplkey not in box_details:
                         box_details[tuplkey] = {}
                     box_details[tuplkey]['queue'] = (box_details[tuplkey].get('queue', 0)
                                                      + int(box['queue']))
@@ -209,7 +209,7 @@ class KannelCollector:
 
         for key, value in box_details.items():
             box_labels = {'type': key[0], 'id': key[1], 'ipaddr': key[2]}
-            if 'queue' in value.keys():
+            if 'queue' in value:
                 metrics['box_queue'].add_sample('bearerbox_box_queue',
                                                 value=value['queue'],
                                                 labels=box_labels)
@@ -275,7 +275,7 @@ class KannelCollector:
                                                                          smsc['status'])
 
                 # kannel 1.5 exposes metrics in a different format
-                if 'sms' not in smsc.keys():
+                if 'sms' not in smsc:
                     aggreg[smscid]['sms']['received'] = (aggreg[smscid]['sms'].get('received', 0)
                                                          + int(smsc['received']['sms']))
                     aggreg[smscid]['sms']['sent'] = (aggreg[smscid]['sms'].get('sent', 0)
