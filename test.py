@@ -23,11 +23,9 @@ class KannelCollectorTestCase(unittest.TestCase):
         uptime1 = uptime_to_secs("running, uptime 0d 1h 16m 31s")
         uptime2 = uptime_to_secs("running, uptime 0d 0h 1m 38s")
         uptime3 = uptime_to_secs("on-line 0d 0h 1m 53s")
-        uptime4 = uptime_to_secs("connecting")
         self.assertEqual(uptime1, 4591)
         self.assertEqual(uptime2, 98)
         self.assertEqual(uptime3, 113)
-        self.assertEqual(uptime4, 0)
 
     def test_kannel_collector(self):
         exporter = KannelCollector('', '')
@@ -175,15 +173,15 @@ Using native malloc."""
         self.assertEqual(metrics['dlr_sent'].samples[3].value, 3)
 
     def test_smsc_metrics_v150(self):
-        exporter = KannelCollector('', '')
+        opts = CollectorOpts(collect_smsc_uptime=True)
+        exporter = KannelCollector('', '', opts)
         metrics = exporter.collect_smsc_stats(self.status150['gateway']['smscs']['count'],
                                               self.status150['gateway']['smscs']['smsc'])
         self.check_smsc_metrics(metrics)
 
     def test_smsc_metrics_v145(self):
-        # with open('test/v145.xml') as xml:
-        #     status = xmltodict.parse(xml.read())
-        exporter = KannelCollector('', '')
+        opts = CollectorOpts(collect_smsc_uptime=True)
+        exporter = KannelCollector('', '', opts)
         metrics = exporter.collect_smsc_stats(self.status145['gateway']['smscs']['count'],
                                               self.status145['gateway']['smscs']['smsc'])
         self.check_smsc_metrics(metrics)

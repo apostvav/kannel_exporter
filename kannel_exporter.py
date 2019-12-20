@@ -24,16 +24,11 @@ logger = logging.getLogger('kannel_exporter')  # pylint: disable=invalid-name
 
 def uptime_to_secs(uptime):
     uptime = findall(r'\d+', uptime)
-
-    if not uptime:
-        return 0
-
     days_in_secs = int(uptime[0]) * 86400
     hours_in_secs = int(uptime[1]) * 3600
     minutes_in_secs = int(uptime[2]) * 60
     secs = int(uptime[3])
-    uptime = days_in_secs + hours_in_secs + minutes_in_secs + secs
-    return uptime
+    return days_in_secs + hours_in_secs + minutes_in_secs + secs
 
 
 def bearerbox_version(version):
@@ -158,7 +153,12 @@ class KannelCollector:
         # Helper method to collect smsc uptime metrics.
         # For multiple smscs with the same id,
         # only the lowest uptime value will be exposed.
-        uptime = uptime_to_secs(uptime)
+        uptime = findall(r'\d+', uptime)
+
+        if not uptime:
+            return 0
+
+        uptime = uptime[0]
 
         if 'uptime' not in smsc_details or uptime < smsc_details['uptime']:
             return uptime
@@ -271,7 +271,8 @@ class KannelCollector:
                 aggreg[smscid]['failed'] = aggreg[smscid].get('failed', 0) + int(smsc['failed'])
                 aggreg[smscid]['queued'] = aggreg[smscid].get('queued', 0) + int(smsc['queued'])
                 if self._opts.collect_smsc_uptime is True:
-                    aggreg[smscid]['uptime'] = self._collect_smsc_uptime(aggreg[smscid], smsc['status'])
+                    aggreg[smscid]['uptime'] = self._collect_smsc_uptime(aggreg[smscid],
+                                                                         smsc['status'])
 
                 # kannel 1.5 exposes metrics in a different format
                 if 'sms' not in smsc.keys():
@@ -424,8 +425,8 @@ def main():
     status_password = get_password(args.password, args.password_file)
 
     # collector options
-    opts = CollectorOpts(args.filter_smsc, args.collect_wdp,
-                         args.collect_box_uptime, args.box_connections)
+    opts = CollectorOpts(args.filter_smsc, args.collect_wdp, args.collect_box_uptime,
+                         args.collect_smsc_uptime, args.box_connections)
 
     REGISTRY.register(KannelCollector(args.target, status_password, opts))
 
