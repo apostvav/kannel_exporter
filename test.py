@@ -33,7 +33,7 @@ class KannelCollectorTestCase(unittest.TestCase):
 
     def test_collector_opts(self):
         opts_def = CollectorOpts()
-        opts_nondef = CollectorOpts(True, True, False, ['smsbox'])
+        opts_nondef = CollectorOpts(True, True, False, False, ['smsbox'])
         self.assertEqual(opts_def.filter_smsc, False)
         self.assertEqual(opts_def.collect_wdp, False)
         self.assertEqual(opts_def.collect_box_uptime, False)
@@ -147,6 +147,12 @@ Using native malloc."""
         self.assertEqual(metrics['queued'].samples[1].value, 3)
         self.assertEqual(metrics['queued'].samples[2].value, 2)
         self.assertEqual(metrics['queued'].samples[3].value, 5)
+        self.assertEqual(metrics['uptime'].documentation,
+                         'SMSC uptime in seconds (*)')
+        self.assertEqual(metrics['uptime'].samples[0].value, 178)
+        self.assertEqual(metrics['uptime'].samples[1].value, 41)
+        self.assertEqual(metrics['uptime'].samples[2].value, 0)
+        self.assertEqual(metrics['uptime'].samples[3].value, 0)
         self.assertEqual(metrics['sms_received'].documentation,
                          'Total number of received SMS by SMSC')
         self.assertEqual(metrics['sms_received'].samples[0].value, 0)
@@ -173,15 +179,15 @@ Using native malloc."""
         self.assertEqual(metrics['dlr_sent'].samples[3].value, 3)
 
     def test_smsc_metrics_v150(self):
-        exporter = KannelCollector('', '')
+        opts = CollectorOpts(collect_smsc_uptime=True)
+        exporter = KannelCollector('', '', opts)
         metrics = exporter.collect_smsc_stats(self.status150['gateway']['smscs']['count'],
                                               self.status150['gateway']['smscs']['smsc'])
         self.check_smsc_metrics(metrics)
 
     def test_smsc_metrics_v145(self):
-        # with open('test/v145.xml') as xml:
-        #     status = xmltodict.parse(xml.read())
-        exporter = KannelCollector('', '')
+        opts = CollectorOpts(collect_smsc_uptime=True)
+        exporter = KannelCollector('', '', opts)
         metrics = exporter.collect_smsc_stats(self.status145['gateway']['smscs']['count'],
                                               self.status145['gateway']['smscs']['smsc'])
         self.check_smsc_metrics(metrics)

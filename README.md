@@ -13,7 +13,8 @@ Works with Kannel 1.4.4 or greater.
 ## Usage
 ```
 kannel_exporter.py [-h] [--target TARGET] [--port PORT]
-                   [--filter-smscs] [--collect-wdp] [--collect-box-uptime]
+                   [--filter-smscs] [--collect-wdp]
+                   [--collect-box-uptime] [--collect-smsc-uptime]
                    [--box-connection-types BOX_CONNECTIONS [BOX_CONNECTIONS ...]]
                    [--log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}] [-v]
                    [--password PASSWORD | --password-file PASSWORD_FILE]
@@ -28,6 +29,7 @@ kannel_exporter.py [-h] [--target TARGET] [--port PORT]
   --filter-smscs         Filter out SMSC metrics
   --collect-wdp          Collect WDP metrics
   --collect-box-uptime   Collect boxes uptime metrics
+  --collect-smsc-uptime  Collect SMSCs uptime metrics
   --box-connection-types List of box connection types. (default wapbox, smsbox)
   --log-level LEVEL      Define the logging level
   -v, --version          Display version information and exit
