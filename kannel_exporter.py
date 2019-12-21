@@ -3,7 +3,7 @@
 """Prometheus custom collector for Kannel gateway
 https://github.com/apostvav/kannel_exporter"""
 
-__version__ = '0.3.3'
+__version__ = '0.4.0'
 
 import argparse
 import logging
@@ -158,7 +158,7 @@ class KannelCollector:
         if not uptime:
             return 0
 
-        uptime = uptime[0]
+        uptime = int(uptime[0])
 
         if 'uptime' not in smsc_details or uptime < smsc_details['uptime']:
             return uptime
