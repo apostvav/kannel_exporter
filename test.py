@@ -147,6 +147,12 @@ Using native malloc."""
         self.assertEqual(metrics['queued'].samples[1].value, 3)
         self.assertEqual(metrics['queued'].samples[2].value, 2)
         self.assertEqual(metrics['queued'].samples[3].value, 5)
+        self.assertEqual(metrics['uptime'].documentation,
+                         'SMSC uptime in seconds (*)')
+        self.assertEqual(metrics['uptime'].samples[0].value, 178)
+        self.assertEqual(metrics['uptime'].samples[1].value, 41)
+        self.assertEqual(metrics['uptime'].samples[2].value, 0)
+        self.assertEqual(metrics['uptime'].samples[3].value, 0)
         self.assertEqual(metrics['sms_received'].documentation,
                          'Total number of received SMS by SMSC')
         self.assertEqual(metrics['sms_received'].samples[0].value, 0)

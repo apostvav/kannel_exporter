@@ -64,7 +64,7 @@
 		<name>HTTP:generic:13515</name>
 		<admin-id>httpsmsc</admin-id>
 		<id>httpsmsc</id>
-		<status>online 28s</status>
+		<status>online 41s</status>
 		<failed>4</failed>
 		<queued>3</queued>
 		<sms>
