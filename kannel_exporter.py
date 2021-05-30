@@ -3,7 +3,7 @@
 """Prometheus custom collector for Kannel gateway
 https://github.com/apostvav/kannel_exporter"""
 
-__version__ = '0.4.1'
+__version__ = '0.4.2'
 
 import argparse
 import logging
