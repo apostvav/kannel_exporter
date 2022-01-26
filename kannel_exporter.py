@@ -3,7 +3,7 @@
 """Prometheus custom collector for Kannel gateway
 https://github.com/apostvav/kannel_exporter"""
 
-__version__ = '0.4.2'
+__version__ = '0.5.0'
 
 import argparse
 import logging
@@ -12,8 +12,10 @@ import sys
 from urllib.request import urlopen
 from urllib.error import URLError
 from re import findall
+from time import time
 from collections import namedtuple, OrderedDict
 from wsgiref.simple_server import make_server
+from typing import Optional
 from prometheus_client.core import GaugeMetricFamily, CounterMetricFamily
 from prometheus_client import REGISTRY, make_wsgi_app
 import xmltodict
@@ -22,7 +24,7 @@ import xmltodict
 logger = logging.getLogger('kannel_exporter')  # pylint: disable=invalid-name
 
 
-def uptime_to_secs(uptime):
+def uptime_to_secs(uptime: str) -> int:
     uptime = findall(r'\d+', uptime)
     days_in_secs = int(uptime[0]) * 86400
     hours_in_secs = int(uptime[1]) * 3600
@@ -31,7 +33,7 @@ def uptime_to_secs(uptime):
     return days_in_secs + hours_in_secs + minutes_in_secs + secs
 
 
-def bearerbox_version(version):
+def bearerbox_version(version: str) -> str:
     try:
         version = version.split('\n')[0]
         version_position = version.find('version ')
@@ -55,19 +57,22 @@ def _xmlpostproc(path, key, value):  # pylint: disable=unused-argument
     return key, value
 
 
-CollectorOpts = namedtuple('CollectorOpts', ['filter_smsc', 'collect_wdp',
-                                             'collect_box_uptime', 'collect_smsc_uptime',
+CollectorOpts = namedtuple('CollectorOpts', ['filter_smsc',
+                                             'collect_wdp',
+                                             'collect_box_uptime',
+                                             'collect_smsc_uptime',
                                              'box_connections'])
-CollectorOpts.__new__.__defaults__ = (False, False, False, False, ['wapbox', 'smsbox'])
+CollectorOpts.__new__.__defaults__ = (False, False, False, False,
+                                      ['wapbox', 'smsbox'])
 
 
 class KannelCollector:
-    def __init__(self, target, password, opts=CollectorOpts()):
+    def __init__(self, target: str, password: str, opts: namedtuple=CollectorOpts()) -> None:
         self._target = target
         self._password = password
         self._opts = opts
 
-    def parse_kannel_status(self):
+    def parse_kannel_status(self) -> Optional[OrderedDict]:
         url = self._target + "/status.xml?password=" + self._password
         status = None
         xml = None
@@ -91,7 +96,7 @@ class KannelCollector:
 
         return status
 
-    def collect_msg_stats(self, gw_metrics):
+    def collect_msg_stats(self, gw_metrics: OrderedDict) -> OrderedDict:
         metrics = OrderedDict()
 
         message_type = ['sms', 'dlr']
@@ -165,7 +170,7 @@ class KannelCollector:
 
         return smsc_details['uptime']
 
-    def collect_box_stats(self, box_metrics):
+    def collect_box_stats(self, box_metrics: OrderedDict) -> OrderedDict:
         metrics = OrderedDict()
         box_connections = {b: 0 for b in self._opts.box_connections}
         box_details = {}
@@ -220,7 +225,7 @@ class KannelCollector:
 
         return metrics
 
-    def collect_smsc_stats(self, smsc_count, smsc_metrics):
+    def collect_smsc_stats(self, smsc_count: dict, smsc_metrics: dict) -> OrderedDict:
         metrics = OrderedDict()
         metrics['smsc_count'] = GaugeMetricFamily('bearerbox_smsc_connections',
                                                   'Number of SMSC connections')
@@ -311,6 +316,8 @@ class KannelCollector:
         metric = GaugeMetricFamily('bearerbox_up',
                                    'Could the bearerbox server be reached')
 
+        start = time()
+
         response = self.parse_kannel_status()
 
         if response is None:
@@ -352,8 +359,14 @@ class KannelCollector:
         for metric in metrics.values():
             yield metric
 
+        duration = time() - start
+        metric = GaugeMetricFamily('bearerbox_scrape_duration_seconds',
+                                   'Bearerbox metrics scrape duration in seconds (*)')
+        metric.add_sample('bearerbox_scrape_duration_seconds', value=duration, labels={})
+        yield metric
 
-def get_password(password, password_file):
+
+def get_password(password: str, password_file: str) -> str:
     if password_file is not None:
         try:
             with open(password_file) as pass_file:
@@ -367,7 +380,7 @@ def get_password(password, password_file):
     return status_password
 
 
-def cli():
+def cli() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Kannel exporter for Prometheus")
     parser.add_argument('--target', dest='target',
                         help='Target kannel server, PROTO:HOST:PORT. ' +
