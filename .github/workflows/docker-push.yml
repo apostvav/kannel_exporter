@@ -9,7 +9,8 @@ jobs:
   push:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v2
+
     - name: Build image
       run: |
         # Get version from git reference
@@ -20,9 +21,12 @@ jobs:
         
         docker build . --file Dockerfile --tag ${{ github.actor }}/kannel_exporter:$VERSION
         docker tag ${{ github.actor }}/kannel_exporter:$VERSION ${{ github.actor }}/kannel_exporter:latest
-    - name: Login
-      run: echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login --username=${{ github.actor }} --password-stdin
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v1
+      with:
+        username: ${{ github.actor }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
     - name: Push
       run: docker push ${{ github.actor }}/kannel_exporter
-    - name: Logout
-      run: docker logout
