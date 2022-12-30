@@ -102,3 +102,8 @@ ENV/
 
 # backup files
 *.bak
+
+# text editors
+.vscode/
+.idea/
+.fleet/
