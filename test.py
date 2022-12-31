@@ -4,7 +4,7 @@ import unittest
 import logging
 import xmltodict
 from kannel_exporter import KannelCollector, uptime_to_secs, bearerbox_version
-from kannel_exporter import get_password, CollectorOpts
+from kannel_exporter import read_password_file, CollectorOpts
 
 logging.basicConfig(level=logging.CRITICAL)
 
@@ -43,9 +43,9 @@ class KannelCollectorTestCase(unittest.TestCase):
         self.assertEqual(opts_nondef.collect_box_uptime, False)
         self.assertEqual(opts_nondef.box_connections, ['smsbox'])
 
-    def test_get_password(self):
-        password = get_password('mypass', None)
-        self.assertEqual(password, 'mypass')
+    def test_read_password(self):
+        password = read_password_file('test/secret')
+        self.assertEqual(password, 'supersecret')
 
     def test_bearerbox_version(self):
         version1 = """Kannel bearerbox version `1.4.5'.
@@ -181,15 +181,13 @@ Using native malloc."""
     def test_smsc_metrics_v150(self):
         opts = CollectorOpts(collect_smsc_uptime=True)
         exporter = KannelCollector('', '', opts)
-        metrics = exporter.collect_smsc_stats(self.status150['gateway']['smscs']['count'],
-                                              self.status150['gateway']['smscs']['smsc'])
+        metrics = exporter.collect_smsc_stats(self.status150['gateway']['smscs'])
         self.check_smsc_metrics(metrics)
 
     def test_smsc_metrics_v145(self):
         opts = CollectorOpts(collect_smsc_uptime=True)
         exporter = KannelCollector('', '', opts)
-        metrics = exporter.collect_smsc_stats(self.status145['gateway']['smscs']['count'],
-                                              self.status145['gateway']['smscs']['smsc'])
+        metrics = exporter.collect_smsc_stats(self.status145['gateway']['smscs'])
         self.check_smsc_metrics(metrics)
 
 

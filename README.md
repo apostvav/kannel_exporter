@@ -8,7 +8,7 @@
 
 Works with Kannel 1.4.4 or greater.
 
-:warning: Consider disabling smsc metrics collection by using the `--filter-smscs` flag or by dropping metrics on Prometheus server. On big setups, high cardinality metrics will be produced.
+:warning: Consider disabling smsc metrics collection by using the `--filter-smscs` flag or by dropping metrics on Prometheus server. On big setups there will be high cardinality issues.
 
 ## Usage
 ```
@@ -46,7 +46,7 @@ Instead of command line arguments, values can be passed using environment variab
 ```
 
 ## Install
-Collector is written in Python3. It is not compatible with Python2.
+Exporter requires Python 3.6 or greater.
 
 ```
 git clone https://github.com/apostvav/kannel_exporter.git
@@ -77,7 +77,7 @@ ExecStart=/path/to/kannel_exporter.py --password-file /path/to/secret
 [Install]
 WantedBy=multi-user.target
 ```
-and then run the commands:
+and then run commands:
 ```
 systemctl daemon-reload
 systemctl start kannel_exporter.service
@@ -88,4 +88,4 @@ systemctl enable kannel_exporter.service
 Any contribution is welcome. Feel free to open issues and pull requests.
 
 For any scraping issues you may have, please open an issue and attach the status xml file.<br />
-Don't forget to strip any information that should not  be shared.  
+Don't forget to strip any information that should not be shared.

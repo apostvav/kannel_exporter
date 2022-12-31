@@ -16,21 +16,22 @@ from time import time
 from collections import namedtuple, OrderedDict
 from wsgiref.simple_server import make_server
 from typing import Optional
+from xml.parsers import expat
+from xmltodict import parse
 from prometheus_client.core import GaugeMetricFamily, CounterMetricFamily
 from prometheus_client import REGISTRY, make_wsgi_app
-import xmltodict
 
 # logger
 logger = logging.getLogger('kannel_exporter')  # pylint: disable=invalid-name
 
 
 def uptime_to_secs(uptime: str) -> int:
-    uptime = findall(r'\d+', uptime)
-    days_in_secs = int(uptime[0]) * 86400
-    hours_in_secs = int(uptime[1]) * 3600
-    minutes_in_secs = int(uptime[2]) * 60
-    secs = int(uptime[3])
-    return days_in_secs + hours_in_secs + minutes_in_secs + secs
+    days, hours, mins, secs = findall(r'\d+', uptime)
+    days = int(days) * 86400
+    hours = int(hours) * 3600
+    mins = int(mins) * 60
+    secs = int(secs)
+    return days + hours + mins + secs
 
 
 def bearerbox_version(version: str) -> str:
@@ -67,7 +68,7 @@ CollectorOpts.__new__.__defaults__ = (False, False, False, False,
 
 
 class KannelCollector:
-    def __init__(self, target: str, password: str, opts: namedtuple=CollectorOpts()) -> None:
+    def __init__(self, target, password, opts=CollectorOpts()):
         self._target = target
         self._password = password
         self._opts = opts
@@ -81,18 +82,18 @@ class KannelCollector:
             with urlopen(url) as request:
                 xml = request.read()
             if xml is not None:
-                status = xmltodict.parse(xml, postprocessor=_xmlpostproc)
+                status = parse(xml, postprocessor=_xmlpostproc)
 
-            if status['gateway'] == 'Denied':
-                logger.error("Authentication failed.")
-                return None
+                if status['gateway'] == 'Denied':
+                    logger.error("Authentication failed.")
+                    return None
 
         except ValueError as err:
-            logger.error("Uknown URL type: %s. Error: %s", url, err)
+            logger.error(f"Uknown URL type: {self._target}. Error: {err}")
         except URLError as err:
-            logger.error("Failed to open target URL: %s. Error: %s", url, err)
-        except xmltodict.expat.ExpatError as err:
-            logger.error("Failed to parse status XML. Error: %s", err)
+            logger.error(f"Failed to open target URL: {self._target}. Error: {err}")
+        except expat.ExpatError as err:
+            logger.error(f"Failed to parse status XML. Error: {err}")
 
         return status
 
@@ -107,18 +108,18 @@ class KannelCollector:
             for key, value in gw_metrics[type_].items():
                 if isinstance(value, dict):
                     for key2, value2 in value.items():
-                        metric_name = 'bearerbox_{0}_{1}_{2}'.format(type_, key, key2)
+                        metric_name = f"bearerbox_{type_}_{key}_{key2}"
                         if key2 == 'total':
-                            metric_help = 'Total number of {0} {1}'.format(type_.upper(), key)
+                            metric_help = f"Total number of {type_.upper()} {key}"
                             metrics[metric_name] = CounterMetricFamily(metric_name, metric_help)
                         else:
-                            metric_help = 'Number of {0} {1} in queue'.format(key, type_.upper())
+                            metric_help = f"Number of {key} {type_.upper()} in queue"
                             metrics[metric_name] = GaugeMetricFamily(metric_name, metric_help)
 
                         metrics[metric_name].add_sample(metric_name, value=int(value2), labels={})
 
-                elif key not in ['inbound', 'outbound']:
-                    metric_name = 'bearerbox_{0}_{1}'.format(type_, key)
+                elif key not in {'inbound', 'outbound'}:
+                    metric_name = f"bearerbox_{type_}_{key}"
                     metric_value = value
                     metric_labels = {}
 
@@ -225,12 +226,12 @@ class KannelCollector:
 
         return metrics
 
-    def collect_smsc_stats(self, smsc_count: dict, smsc_metrics: dict) -> OrderedDict:
+    def collect_smsc_stats(self, smsc_metrics: OrderedDict) -> OrderedDict:
         metrics = OrderedDict()
         metrics['smsc_count'] = GaugeMetricFamily('bearerbox_smsc_connections',
                                                   'Number of SMSC connections')
         metrics['smsc_count'].add_sample('bearerbox_smsc_connections',
-                                         value=int(smsc_count),
+                                         value=int(smsc_metrics['count']),
                                          labels={})
 
         if not self._opts.filter_smsc:
@@ -259,13 +260,13 @@ class KannelCollector:
 
             # when there's only one smsc connection on the gateway
             # xmltodict returns an OrderedDict instead of a list of OrderedDicts
-            if not isinstance(smsc_metrics, list):
-                smsc_metrics = [smsc_metrics]
+            if not isinstance(smsc_metrics['smsc'], list):
+                smsc_metrics['smsc'] = [smsc_metrics['smsc']]
 
             # Group SMSC metrics by smsc-id
             aggreg = OrderedDict()
 
-            for smsc in smsc_metrics:
+            for smsc in smsc_metrics['smsc']:
                 smscid = smsc['id']
 
                 if smscid not in aggreg:
@@ -354,8 +355,7 @@ class KannelCollector:
             yield metric
 
         # SMSC metrics
-        metrics = self.collect_smsc_stats(response['gateway']['smscs']['count'],
-                                          response['gateway']['smscs']['smsc'])
+        metrics = self.collect_smsc_stats(response['gateway']['smscs'])
         for metric in metrics.values():
             yield metric
 
@@ -366,18 +366,16 @@ class KannelCollector:
         yield metric
 
 
-def get_password(password: str, password_file: str) -> str:
-    if password_file is not None:
-        try:
-            with open(password_file) as pass_file:
-                status_password = pass_file.read().strip()
-        except OSError as err:
-            sys.exit("Failed to open file {0}.\n{1}".format(password_file, err))
-        except UnicodeError as err:
-            sys.exit("Failed to read file {0}.\n{1}".format(password_file, err))
-    else:
-        status_password = password
-    return status_password
+def read_password_file(path: str) -> str:
+    try:
+        with open(path) as pass_file:
+            password = pass_file.read().strip()
+    except OSError as err:
+        sys.exit(f"Failed to open file {path}.\n{err}")
+    except UnicodeError as err:
+        sys.exit(f"Failed to read file {path}.\n{err}")
+
+    return password
 
 
 def cli() -> argparse.ArgumentParser:
@@ -422,20 +420,21 @@ def main():
 
     # display version and exit
     if args.version is True:
-        print("Version is {0}".format(__version__))
+        print(f"Version is {__version__}")
         sys.exit()
-
-    # check if password has been set
-    if args.password is None and args.password_file is None:
-        parser.error('Option --password or --password-file must be set.')
 
     # logger configuration
     logging.basicConfig(format='%(asctime)s %(name)s %(levelname)s: %(message)s',
                         datefmt="%Y-%m-%d %H:%M:%S")
     logger.setLevel(args.log_level)
 
-    # get password
-    status_password = get_password(args.password, args.password_file)
+    # check if password has been set
+    if args.password is None and args.password_file is None:
+        parser.error('Option --password or --password-file must be set.')
+    elif args.password_file:
+        status_password = read_password_file(args.password_file)
+    else:
+        status_password = args.password
 
     # collector options
     opts = CollectorOpts(args.filter_smsc, args.collect_wdp, args.collect_box_uptime,
