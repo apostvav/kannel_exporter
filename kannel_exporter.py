@@ -3,7 +3,7 @@
 """Prometheus custom collector for Kannel gateway
 https://github.com/apostvav/kannel_exporter"""
 
-__version__ = '0.5.0'
+__version__ = '0.6.0'
 
 import argparse
 import logging
@@ -19,7 +19,9 @@ from typing import Optional
 from xml.parsers import expat
 from xmltodict import parse
 from prometheus_client.core import GaugeMetricFamily, CounterMetricFamily
-from prometheus_client import REGISTRY, make_wsgi_app
+from prometheus_client import REGISTRY, PLATFORM_COLLECTOR
+from prometheus_client import GC_COLLECTOR, PROCESS_COLLECTOR
+from prometheus_client import make_wsgi_app
 
 # logger
 logger = logging.getLogger('kannel_exporter')  # pylint: disable=invalid-name
@@ -89,11 +91,11 @@ class KannelCollector:
                     return None
 
         except ValueError as err:
-            logger.error(f"Uknown URL type: {self._target}. Error: {err}")
+            logger.error("Uknown URL type: %s. Error: %s", self._target, err)
         except URLError as err:
-            logger.error(f"Failed to open target URL: {self._target}. Error: {err}")
+            logger.error("Failed to open target URL: %s. Error: %s", self._target, err)
         except expat.ExpatError as err:
-            logger.error(f"Failed to parse status XML. Error: {err}")
+            logger.error("Failed to parse status XML. Error: %s", err)
 
         return status
 
@@ -398,6 +400,8 @@ def cli() -> argparse.ArgumentParser:
     parser.add_argument('--box-connection-types', dest='box_connections',
                         nargs='+', default=['wapbox', 'smsbox'],
                         help='List of box connection types. (default wapbox, smsbox)')
+    parser.add_argument('--disable-exporter-metrics', dest='disable_exporter_metrics',
+                        action='store_true', help='Disable exporter metrics')
     parser.add_argument('--log-level', dest='log_level', default='WARNING',
                         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
                         help='Define the logging level')
@@ -439,6 +443,11 @@ def main():
     # collector options
     opts = CollectorOpts(args.filter_smsc, args.collect_wdp, args.collect_box_uptime,
                          args.collect_smsc_uptime, args.box_connections)
+
+    if args.disable_exporter_metrics:  # stop exposing exporter process metrics
+        REGISTRY.unregister(GC_COLLECTOR)
+        REGISTRY.unregister(PROCESS_COLLECTOR)
+        REGISTRY.unregister(PLATFORM_COLLECTOR)
 
     REGISTRY.register(KannelCollector(args.target, status_password, opts))
 
