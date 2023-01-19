@@ -9,15 +9,17 @@ import argparse
 import logging
 import os
 import sys
+import re
 from urllib.request import urlopen
 from urllib.error import URLError
-from re import findall
 from time import time
-from collections import namedtuple, OrderedDict
+from collections import namedtuple
 from wsgiref.simple_server import make_server
-from typing import Optional
+from typing import Any, Optional, Dict, List
 from xml.parsers import expat
-from xmltodict import parse
+import xmltodict
+from prometheus_client.registry import Collector
+from prometheus_client.core import Metric
 from prometheus_client.core import GaugeMetricFamily, CounterMetricFamily
 from prometheus_client import REGISTRY, PLATFORM_COLLECTOR
 from prometheus_client import GC_COLLECTOR, PROCESS_COLLECTOR
@@ -28,7 +30,7 @@ logger = logging.getLogger('kannel_exporter')  # pylint: disable=invalid-name
 
 
 def uptime_to_secs(uptime: str) -> int:
-    days, hours, mins, secs = findall(r'\d+', uptime)
+    days, hours, mins, secs = re.findall(r'\d+', uptime)
     days = int(days) * 86400
     hours = int(hours) * 3600
     mins = int(mins) * 60
@@ -69,75 +71,99 @@ CollectorOpts.__new__.__defaults__ = (False, False, False, False,
                                       ['wapbox', 'smsbox'])
 
 
-class KannelCollector:
+class KannelCollector(Collector):
     def __init__(self, target, password, opts=CollectorOpts()):
-        self._target = target
-        self._password = password
-        self._opts = opts
+        self.target = target
+        self.password = password
+        self.opts = opts
 
-    def parse_kannel_status(self) -> Optional[OrderedDict]:
-        url = self._target + "/status.xml?password=" + self._password
+    def parse_kannel_status(self) -> Optional[Dict[str, Any]]:
+        url = self.target + '/status.xml?password=' + self.password
         status = None
         xml = None
 
         try:
-            with urlopen(url) as request:
-                xml = request.read()
+            with urlopen(url) as response:
+                xml = response.read()
             if xml is not None:
-                status = parse(xml, postprocessor=_xmlpostproc)
+                status = xmltodict.parse(xml, postprocessor=_xmlpostproc)
 
                 if status['gateway'] == 'Denied':
-                    logger.error("Authentication failed.")
+                    logger.error('Authentication failed.')
                     return None
 
         except ValueError as err:
-            logger.error("Uknown URL type: %s. Error: %s", self._target, err)
+            logger.error("Uknown URL type: %s. Error: %s", self.target, err)
         except URLError as err:
-            logger.error("Failed to open target URL: %s. Error: %s", self._target, err)
+            logger.error("Failed to open target URL: %s. Error: %s", self.target, err)
+        except TimeoutError:
+            logger.error("Request to kannel gateway timed out")
         except expat.ExpatError as err:
             logger.error("Failed to parse status XML. Error: %s", err)
 
         return status
 
-    def collect_msg_stats(self, gw_metrics: OrderedDict) -> OrderedDict:
-        metrics = OrderedDict()
+    def collect_msg_stats(self, gw_metrics: Dict[str, Any]) -> List[Metric]:
+        metrics = []
+        directions = ['received', 'sent']
+        states = ['total', 'queued']
 
-        message_type = ['sms', 'dlr']
-        if self._opts.collect_wdp is True:
-            message_type = ['wdp'] + message_type
+        # collect WDP metrics
+        if self.opts.collect_wdp:
+            for direction in directions:
+                for state in states:
+                    metric_name = f"bearerbox_wdp_{direction}_{state}"
+                    if state == 'total':
+                        metric_help = f"Total number of WDP {direction}"
+                        metric = CounterMetricFamily(metric_name, metric_help)
+                    else:
+                        metric_help = f"Number of {direction} WDP in queue"
+                        metric = GaugeMetricFamily(metric_name, metric_help)
+                    metric_value = int(gw_metrics['wdp'][direction][state])
+                    metric.add_sample(metric_name, value=metric_value,
+                                      labels={})
+                    metrics.append(metric)
 
-        for type_ in message_type:
-            for key, value in gw_metrics[type_].items():
-                if isinstance(value, dict):
-                    for key2, value2 in value.items():
-                        metric_name = f"bearerbox_{type_}_{key}_{key2}"
-                        if key2 == 'total':
-                            metric_help = f"Total number of {type_.upper()} {key}"
-                            metrics[metric_name] = CounterMetricFamily(metric_name, metric_help)
-                        else:
-                            metric_help = f"Number of {key} {type_.upper()} in queue"
-                            metrics[metric_name] = GaugeMetricFamily(metric_name, metric_help)
+        # collect SMS metrics
+        for direction in directions:
+            for state in states:
+                metric_name = f"bearerbox_sms_{direction}_{state}"
+                if state == 'total':
+                    metric_help = f"Total number of SMS {direction}"
+                    metric = CounterMetricFamily(metric_name, metric_help)
+                else:
+                    metric_help = f"Number of {direction} SMS in queue"
+                    metric = GaugeMetricFamily(metric_name, metric_help)
+                metric_value = int(gw_metrics['sms'][direction][state])
+                metric.add_sample(metric_name, value=metric_value, labels={})
+                metrics.append(metric)
 
-                        metrics[metric_name].add_sample(metric_name, value=int(value2), labels={})
+        metric_name = 'bearerbox_sms_storesize'
+        metric_value = int(gw_metrics['sms']['storesize'])
+        metric = GaugeMetricFamily(metric_name, 'Number of SMS in storesize')
+        metric.add_sample('bearerbox_sms_storesize', value=metric_value, labels={})
+        metrics.append(metric)
 
-                elif key not in {'inbound', 'outbound'}:
-                    metric_name = f"bearerbox_{type_}_{key}"
-                    metric_value = value
-                    metric_labels = {}
+        # collect DLR metrics
+        for direction in directions:
+            metric_name = f"bearerbox_dlr_{direction}_total"
+            metric_help = f"Total number of DLR {direction}"
+            metric_value = int(gw_metrics['dlr'][direction]['total'])
+            metric = CounterMetricFamily(metric_name, metric_help)
+            metric.add_sample(metric_name, value=metric_value, labels={})
+            metrics.append(metric)
 
-                    if type_ == 'sms' and key == 'storesize':
-                        metric_help = 'Number of SMS in storesize'
-                    elif type_ == 'dlr':
-                        if key == 'queued':
-                            metric_help = 'Number of DLRs in queue'
-                        elif key == 'storage':
-                            metric_help = 'DLR storage type info'
-                            metric_value = 1
-                            metric_labels = {'storage': value}
+        metric_name = 'bearerbox_dlr_queued'
+        metric_value = int(gw_metrics['dlr']['queued'])
+        metric = GaugeMetricFamily(metric_name, "Number of DLRs in queue")
+        metric.add_sample(metric_name, value=metric_value, labels={})
+        metrics.append(metric)
 
-                    metrics[metric_name] = GaugeMetricFamily(metric_name, metric_help)
-                    metrics[metric_name].add_sample(metric_name, value=int(metric_value),
-                                                    labels=metric_labels)
+        metric_name = 'bearerbox_dlr_storage'
+        metric = GaugeMetricFamily(metric_name, 'DLR storage type info')
+        metric_labels = {'storage': gw_metrics['dlr']['storage']}
+        metric.add_sample(metric_name, value=1, labels=metric_labels)
+        metrics.append(metric)
 
         return metrics
 
@@ -161,7 +187,7 @@ class KannelCollector:
         # Helper method to collect smsc uptime metrics.
         # For multiple smscs with the same id,
         # only the lowest uptime value will be exposed.
-        uptime = findall(r'\d+', uptime)
+        uptime = re.findall(r'\d+', uptime)
 
         if not uptime:
             return 0
@@ -173,20 +199,19 @@ class KannelCollector:
 
         return smsc_details['uptime']
 
-    def collect_box_stats(self, box_metrics: OrderedDict) -> OrderedDict:
-        metrics = OrderedDict()
-        box_connections = {b: 0 for b in self._opts.box_connections}
+    def collect_box_stats(self, box_metrics: Dict[str, Any]) -> List[Metric]:
+        metrics = []
+        box_connections = {b: 0 for b in self.opts.box_connections}
         box_details = {}
-        metrics['box_connections'] = GaugeMetricFamily('bearerbox_box_connections',
-                                                       'Number of box connections')
-        metrics['box_queue'] = GaugeMetricFamily('bearerbox_box_queue',
-                                                 'Number of messages in box queue')
 
-        if self._opts.collect_box_uptime is True:
-            metrics['box_uptime'] = GaugeMetricFamily('bearerbox_box_uptime_seconds',
-                                                      'Box uptime in seconds (*)')
+        box_conn_mtr = GaugeMetricFamily('bearerbox_box_connections',
+                                         'Number of box connections')
+        box_queue_mtr = GaugeMetricFamily('bearerbox_box_queue',
+                                          'Number of messages in box queue')
+        box_uptime_mtr = GaugeMetricFamily('bearerbox_box_uptime_seconds',
+                                           'Box uptime in seconds (*)')
 
-        if box_metrics != '':
+        if box_metrics:
             # when there's only one box connected on the gateway
             # xmltodict returns an OrderedDict instead of a list of OrderedDicts
             if not isinstance(box_metrics['box'], list):
@@ -196,7 +221,7 @@ class KannelCollector:
                 box_connections[box['type']] = box_connections.get(box['type'], 0) + 1
 
                 # some type of boxes (e.g wapbox) don't have IDs.
-                box['id'] = box.get('id', "")
+                box['id'] = box.get('id', '')
 
                 tuplkey = (box['type'], box['id'], box['IP'])
 
@@ -208,109 +233,121 @@ class KannelCollector:
                                                      + int(box['queue']))
 
                 # collect box uptime metrics
-                if self._opts.collect_box_uptime is True:
+                if self.opts.collect_box_uptime is True:
                     self._collect_box_uptime(box_details, box, tuplkey)
 
         for key, value in box_connections.items():
-            metrics['box_connections'].add_sample('bearerbox_box_connections',
-                                                  value=value, labels={'type': key})
+            box_conn_mtr.add_sample('bearerbox_box_connections',
+                                     value=value, labels={'type': key})
+
+        metrics.append(box_conn_mtr)
 
         for key, value in box_details.items():
             box_labels = {'type': key[0], 'id': key[1], 'ipaddr': key[2]}
             if 'queue' in value:
-                metrics['box_queue'].add_sample('bearerbox_box_queue',
-                                                value=value['queue'],
-                                                labels=box_labels)
-            if self._opts.collect_box_uptime is True:
-                metrics['box_uptime'].add_sample('bearerbox_box_uptime_seconds',
-                                                 value=value['uptime'],
-                                                 labels=box_labels)
+                box_queue_mtr.add_sample('bearerbox_box_queue',
+                                         value=value['queue'],
+                                         labels=box_labels)
+            if self.opts.collect_box_uptime is True:
+                box_uptime_mtr.add_sample('bearerbox_box_uptime_seconds',
+                                          value=value['uptime'],
+                                          labels=box_labels)
+
+        metrics.append(box_queue_mtr)
+
+        if self.opts.collect_box_uptime is True:
+            metrics.append(box_uptime_mtr)
 
         return metrics
 
-    def collect_smsc_stats(self, smsc_metrics: OrderedDict) -> OrderedDict:
-        metrics = OrderedDict()
-        metrics['smsc_count'] = GaugeMetricFamily('bearerbox_smsc_connections',
-                                                  'Number of SMSC connections')
-        metrics['smsc_count'].add_sample('bearerbox_smsc_connections',
-                                         value=int(smsc_metrics['count']),
-                                         labels={})
+    def collect_smsc_stats(self, smsc_metrics: Dict[str, Any]) -> List[Metric]:
+        metrics = []
 
-        if not self._opts.filter_smsc:
-            metrics['failed'] = CounterMetricFamily('bearerbox_smsc_failed_messages_total',
-                                                    'Total number of SMSC failed messages',
-                                                    labels=["smsc_id"])
-            metrics['queued'] = GaugeMetricFamily('bearerbox_smsc_queued_messages',
-                                                  'Number of SMSC queued messages',
-                                                  labels=["smsc_id"])
-            metrics['sms_received'] = CounterMetricFamily('bearerbox_smsc_received_sms_total',
-                                                          'Total number of received SMS by SMSC',
-                                                          labels=["smsc_id"])
-            metrics['sms_sent'] = CounterMetricFamily('bearerbox_smsc_sent_sms_total',
-                                                      'Total number of SMS sent to SMSC',
-                                                      labels=["smsc_id"])
-            metrics['dlr_received'] = CounterMetricFamily('bearerbox_smsc_received_dlr_total',
-                                                          'Total number of DLRs received by SMSC',
-                                                          labels=["smsc_id"])
-            metrics['dlr_sent'] = CounterMetricFamily('bearerbox_smsc_sent_dlr_total',
-                                                      'Total number of DLRs sent to SMSC',
-                                                      labels=["smsc_id"])
-            if self._opts.collect_smsc_uptime is True:
-                metrics['uptime'] = GaugeMetricFamily('bearerbox_smsc_uptime_seconds',
-                                                      'SMSC uptime in seconds (*)',
-                                                      labels=["smsc_id"])
+        failed = CounterMetricFamily('bearerbox_smsc_failed_messages_total',
+                                     'Total number of SMSC failed messages',
+                                     labels=['smsc_id'])
+        queued = GaugeMetricFamily('bearerbox_smsc_queued_messages',
+                                   'Number of SMSC queued messages',
+                                   labels=['smsc_id'])
+        sms_received = CounterMetricFamily('bearerbox_smsc_received_sms_total',
+                                           'Total number of received SMS by SMSC',
+                                           labels=['smsc_id'])
+        sms_sent = CounterMetricFamily('bearerbox_smsc_sent_sms_total',
+                                       'Total number of SMS sent to SMSC',
+                                       labels=['smsc_id'])
+        dlr_received = CounterMetricFamily('bearerbox_smsc_received_dlr_total',
+                                           'Total number of DLRs received by SMSC',
+                                           labels=['smsc_id'])
+        dlr_sent = CounterMetricFamily('bearerbox_smsc_sent_dlr_total',
+                                       'Total number of DLRs sent to SMSC',
+                                       labels=['smsc_id'])
+        uptime = GaugeMetricFamily('bearerbox_smsc_uptime_seconds',
+                                   'SMSC uptime in seconds (*)',
+                                   labels=['smsc_id'])
 
-            # when there's only one smsc connection on the gateway
-            # xmltodict returns an OrderedDict instead of a list of OrderedDicts
-            if not isinstance(smsc_metrics['smsc'], list):
-                smsc_metrics['smsc'] = [smsc_metrics['smsc']]
+        # when there's only one smsc connection on the gateway
+        # xmltodict returns a dict instead of a list of dicts
+        if not isinstance(smsc_metrics['smsc'], list):
+            smsc_metrics['smsc'] = [smsc_metrics['smsc']]
 
-            # Group SMSC metrics by smsc-id
-            aggreg = OrderedDict()
+        # Aggregate SMSC metrics by smsc-id
+        aggreg = {}
 
-            for smsc in smsc_metrics['smsc']:
-                smscid = smsc['id']
+        for smsc in smsc_metrics['smsc']:
+            smscid = smsc['id']
 
-                if smscid not in aggreg:
-                    aggreg[smscid] = OrderedDict()
-                    aggreg[smscid]['sms'] = OrderedDict()
-                    aggreg[smscid]['dlr'] = OrderedDict()
+            if smscid not in aggreg:
+                aggreg[smscid] = {}
+                aggreg[smscid]['sms'] = {}
+                aggreg[smscid]['dlr'] = {}
 
-                aggreg[smscid]['failed'] = aggreg[smscid].get('failed', 0) + int(smsc['failed'])
-                aggreg[smscid]['queued'] = aggreg[smscid].get('queued', 0) + int(smsc['queued'])
-                if self._opts.collect_smsc_uptime is True:
-                    aggreg[smscid]['uptime'] = self._collect_smsc_uptime(aggreg[smscid],
-                                                                         smsc['status'])
+            aggreg[smscid]['failed'] = (aggreg[smscid].get('failed', 0)
+                                        + int(smsc['failed']))
+            aggreg[smscid]['queued'] = (aggreg[smscid].get('queued', 0)
+                                        + int(smsc['queued']))
+            if self.opts.collect_smsc_uptime is True:
+                aggreg[smscid]['uptime'] = self._collect_smsc_uptime(aggreg[smscid],
+                                                                     smsc['status'])
 
-                # kannel 1.5 exposes metrics in a different format
-                if 'sms' not in smsc:
-                    aggreg[smscid]['sms']['received'] = (aggreg[smscid]['sms'].get('received', 0)
-                                                         + int(smsc['received']['sms']))
-                    aggreg[smscid]['sms']['sent'] = (aggreg[smscid]['sms'].get('sent', 0)
-                                                     + int(smsc['sent']['sms']))
-                    aggreg[smscid]['dlr']['received'] = (aggreg[smscid]['dlr'].get('received', 0)
-                                                         + int(smsc['received']['dlr']))
-                    aggreg[smscid]['dlr']['sent'] = (aggreg[smscid]['dlr'].get('sent', 0)
-                                                     + int(smsc['sent']['dlr']))
-                else:
-                    aggreg[smscid]['sms']['received'] = (aggreg[smscid]['sms'].get('received', 0)
-                                                         + int(smsc['sms']['received']))
-                    aggreg[smscid]['sms']['sent'] = (aggreg[smscid]['sms'].get('sent', 0)
-                                                     + int(smsc['sms']['sent']))
-                    aggreg[smscid]['dlr']['received'] = (aggreg[smscid]['dlr'].get('received', 0)
-                                                         + int(smsc['dlr']['received']))
-                    aggreg[smscid]['dlr']['sent'] = (aggreg[smscid]['dlr'].get('sent', 0)
-                                                     + int(smsc['dlr']['sent']))
+            # kannel 1.5 exposes metrics in a different format
+            if 'sms' not in smsc:
+                aggreg[smscid]['sms']['received'] = (aggreg[smscid]['sms'].get('received', 0)
+                                                     + int(smsc['received']['sms']))
+                aggreg[smscid]['sms']['sent'] = (aggreg[smscid]['sms'].get('sent', 0)
+                                                 + int(smsc['sent']['sms']))
+                aggreg[smscid]['dlr']['received'] = (aggreg[smscid]['dlr'].get('received', 0)
+                                                     + int(smsc['received']['dlr']))
+                aggreg[smscid]['dlr']['sent'] = (aggreg[smscid]['dlr'].get('sent', 0)
+                                                 + int(smsc['sent']['dlr']))
+            else:
+                aggreg[smscid]['sms']['received'] = (aggreg[smscid]['sms'].get('received', 0)
+                                                     + int(smsc['sms']['received']))
+                aggreg[smscid]['sms']['sent'] = (aggreg[smscid]['sms'].get('sent', 0)
+                                                 + int(smsc['sms']['sent']))
+                aggreg[smscid]['dlr']['received'] = (aggreg[smscid]['dlr'].get('received', 0)
+                                                     + int(smsc['dlr']['received']))
+                aggreg[smscid]['dlr']['sent'] = (aggreg[smscid]['dlr'].get('sent', 0)
+                                                 + int(smsc['dlr']['sent']))
 
-            for smsc in aggreg:
-                metrics['failed'].add_metric([smsc], aggreg[smsc]['failed'])
-                metrics['queued'].add_metric([smsc], aggreg[smsc]['queued'])
-                metrics['sms_received'].add_metric([smsc], aggreg[smsc]['sms']['received'])
-                metrics['sms_sent'].add_metric([smsc], aggreg[smsc]['sms']['sent'])
-                metrics['dlr_received'].add_metric([smsc], aggreg[smsc]['dlr']['received'])
-                metrics['dlr_sent'].add_metric([smsc], aggreg[smsc]['dlr']['sent'])
-                if self._opts.collect_smsc_uptime is True:
-                    metrics['uptime'].add_metric([smsc], aggreg[smsc]['uptime'])
+        for smsc in aggreg:  # pylint: disable=consider-using-dict-items
+            failed.add_metric([smsc], aggreg[smsc]['failed'])
+            queued.add_metric([smsc], aggreg[smsc]['queued'])
+            sms_received.add_metric([smsc], aggreg[smsc]['sms']['received'])
+            sms_sent.add_metric([smsc], aggreg[smsc]['sms']['sent'])
+            dlr_received.add_metric([smsc], aggreg[smsc]['dlr']['received'])
+            dlr_sent.add_metric([smsc], aggreg[smsc]['dlr']['sent'])
+            if self.opts.collect_smsc_uptime is True:
+                uptime.add_metric([smsc], aggreg[smsc]['uptime'])
+
+        metrics.append(failed)
+        metrics.append(queued)
+        metrics.append(sms_received)
+        metrics.append(sms_sent)
+        metrics.append(dlr_received)
+        metrics.append(dlr_sent)
+
+        if self.opts.collect_smsc_uptime:
+            metrics.append(uptime)
 
         return metrics
 
@@ -347,19 +384,28 @@ class KannelCollector:
         yield metric
 
         # WDP, SMS & DLR metrics
-        metrics = self.collect_msg_stats(response['gateway'])
-        for metric in metrics.values():
+        msg_metrics = self.collect_msg_stats(response['gateway'])
+        for metric in msg_metrics:
             yield metric
 
         # Box metrics
-        metrics = self.collect_box_stats(response['gateway']['boxes'])
-        for metric in metrics.values():
+        box_metrics = self.collect_box_stats(response['gateway']['boxes'])
+        for metric in box_metrics:
             yield metric
 
+        # Number of smsc connections
+        metric = GaugeMetricFamily('bearerbox_smsc_connections',
+                                    'Number of SMSC connections')
+        metric.add_sample('bearerbox_smsc_connections',
+                          value=int(response['gateway']['smscs']['count']),
+                          labels={})
+        yield metric
+
         # SMSC metrics
-        metrics = self.collect_smsc_stats(response['gateway']['smscs'])
-        for metric in metrics.values():
-            yield metric
+        if not self.opts.filter_smsc:
+            smsc_metrics = self.collect_smsc_stats(response['gateway']['smscs'])
+            for metric in smsc_metrics:
+                yield metric
 
         duration = time() - start
         metric = GaugeMetricFamily('bearerbox_scrape_duration_seconds',
@@ -428,7 +474,7 @@ def main():
         sys.exit()
 
     # logger configuration
-    logging.basicConfig(format='%(asctime)s %(name)s %(levelname)s: %(message)s',
+    logging.basicConfig(format="%(asctime)s %(name)s %(levelname)s: %(message)s",
                         datefmt="%Y-%m-%d %H:%M:%S")
     logger.setLevel(args.log_level)
 
