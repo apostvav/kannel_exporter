@@ -3,7 +3,7 @@
 """Prometheus custom collector for Kannel gateway
 https://github.com/apostvav/kannel_exporter"""
 
-__version__ = '0.7.0'
+__version__ = '0.7.1'
 
 import argparse
 import logging
@@ -62,12 +62,13 @@ def _xmlpostproc(path, key, value):  # pylint: disable=unused-argument
     return key, value
 
 
-CollectorOpts = namedtuple('CollectorOpts', ['filter_smsc',
+CollectorOpts = namedtuple('CollectorOpts', ['timeout',
+                                             'filter_smsc',
                                              'collect_wdp',
                                              'collect_box_uptime',
                                              'collect_smsc_uptime',
                                              'box_connections'])
-CollectorOpts.__new__.__defaults__ = (False, False, False, False,
+CollectorOpts.__new__.__defaults__ = (15, False, False, False, False,
                                       ['wapbox', 'smsbox'])
 
 
@@ -83,7 +84,7 @@ class KannelCollector(Collector):
         xml = None
 
         try:
-            with urlopen(url) as response:
+            with urlopen(url, timeout=self.opts.timeout) as response:
                 xml = response.read()
             if xml is not None:
                 status = xmltodict.parse(xml, postprocessor=_xmlpostproc)
@@ -96,8 +97,6 @@ class KannelCollector(Collector):
             logger.error("Uknown URL type: %s. Error: %s", self.target, err)
         except URLError as err:
             logger.error("Failed to open target URL: %s. Error: %s", self.target, err)
-        except TimeoutError:
-            logger.error("Request to kannel gateway timed out")
         except expat.ExpatError as err:
             logger.error("Failed to parse status XML. Error: %s", err)
 
@@ -435,6 +434,9 @@ def cli() -> argparse.ArgumentParser:
     parser.add_argument('--port', dest='port', type=int,
                         help='Exporter port. (default 9390)',
                         default=int(os.environ.get('KANNEL_EXPORTER_PORT', '9390')))
+    parser.add_argument('--timeout', dest='timeout', type=int,
+                        help='Timeout for trying to get stats. (default 15)',
+                        default=int(os.environ.get('KANNEL_EXPORTER_TIMEOUT', '15')))
     parser.add_argument('--filter-smscs', dest='filter_smsc', action='store_true',
                         help='Filter out SMSC metrics')
     parser.add_argument('--collect-wdp', dest='collect_wdp', action='store_true',
@@ -487,8 +489,9 @@ def main():
         status_password = args.password
 
     # collector options
-    opts = CollectorOpts(args.filter_smsc, args.collect_wdp, args.collect_box_uptime,
-                         args.collect_smsc_uptime, args.box_connections)
+    opts = CollectorOpts(args.timeout, args.filter_smsc, args.collect_wdp,
+                         args.collect_box_uptime, args.collect_smsc_uptime,
+                         args.box_connections)
 
     if args.disable_exporter_metrics:  # stop exposing exporter process metrics
         REGISTRY.unregister(GC_COLLECTOR)

@@ -33,11 +33,13 @@ class KannelCollectorTestCase(unittest.TestCase):
 
     def test_collector_opts(self):
         opts_def = CollectorOpts()
-        opts_nondef = CollectorOpts(True, True, False, False, ['smsbox'])
+        opts_nondef = CollectorOpts(5, True, True, False, False, ['smsbox'])
+        self.assertEqual(opts_def.timeout, 15)
         self.assertEqual(opts_def.filter_smsc, False)
         self.assertEqual(opts_def.collect_wdp, False)
         self.assertEqual(opts_def.collect_box_uptime, False)
         self.assertEqual(opts_def.box_connections, ['wapbox', 'smsbox'])
+        self.assertEqual(opts_nondef.timeout, 5)
         self.assertEqual(opts_nondef.filter_smsc, True)
         self.assertEqual(opts_nondef.collect_wdp, True)
         self.assertEqual(opts_nondef.collect_box_uptime, False)
