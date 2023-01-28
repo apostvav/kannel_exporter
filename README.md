@@ -13,7 +13,7 @@ Works with Kannel 1.4.4 or greater.
 ## Usage
 ```
 kannel_exporter.py [-h] [--target TARGET] [--port PORT]
-                   [--filter-smscs] [--collect-wdp]
+                   [--timeout SECONDS] [--filter-smscs] [--collect-wdp]
                    [--collect-box-uptime] [--collect-smsc-uptime]
                    [--box-connection-types BOX_CONNECTIONS [BOX_CONNECTIONS ...]]
                    [--log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}] [-v]
@@ -26,6 +26,7 @@ kannel_exporter.py [-h] [--target TARGET] [--port PORT]
   --target TARGET            Target kannel server, PROTO:HOST:PORT
                              (default http://127.0.0.1:13000)
   --port PORT                Exporter port. (default 9390)
+  --timeout SECONDS          Timeout for trying to get stats. (default 15)
   --filter-smscs             Filter out SMSC metrics
   --collect-wdp              Collect WDP metrics
   --collect-box-uptime       Collect boxes uptime metrics
@@ -44,6 +45,7 @@ Instead of command line arguments, values can be passed using environment variab
 --target    KANNEL_HOST
 --password  KANNEL_STATUS_PASSWORD
 --port      KANNEL_EXPORTER_PORT
+--timeout   KANNEL_EXPORTER_TIMEOUT
 ```
 
 ## Install
