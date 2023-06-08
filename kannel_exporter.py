@@ -3,7 +3,7 @@
 """Prometheus custom collector for Kannel gateway
 https://github.com/apostvav/kannel_exporter"""
 
-__version__ = '0.7.1'
+__version__ = '0.8.0'
 
 import argparse
 import logging
@@ -242,44 +242,10 @@ class KannelCollector(Collector):
 
         return metrics
 
-    def collect_smsc_stats(self, smsc_metrics: Dict[str, Any]) -> List[Metric]:
-        failed = CounterMetricFamily('bearerbox_smsc_failed_messages_total',
-                                     'Total number of SMSC failed messages',
-                                     labels=['smsc_id'])
-        queued = GaugeMetricFamily('bearerbox_smsc_queued_messages',
-                                   'Number of SMSC queued messages',
-                                   labels=['smsc_id'])
-        sms_received = CounterMetricFamily('bearerbox_smsc_received_sms_total',
-                                           'Total number of received SMS by SMSC',
-                                           labels=['smsc_id'])
-        sms_sent = CounterMetricFamily('bearerbox_smsc_sent_sms_total',
-                                       'Total number of SMS sent to SMSC',
-                                       labels=['smsc_id'])
-        dlr_received = CounterMetricFamily('bearerbox_smsc_received_dlr_total',
-                                           'Total number of DLRs received by SMSC',
-                                           labels=['smsc_id'])
-        dlr_sent = CounterMetricFamily('bearerbox_smsc_sent_dlr_total',
-                                       'Total number of DLRs sent to SMSC',
-                                       labels=['smsc_id'])
-        conn_online = GaugeMetricFamily('bearerbox_smsc_online_connections',
-                                        'Number of online SMSC connections',
-                                        labels=['smsc_id'])
-        conn_offline = GaugeMetricFamily('bearerbox_smsc_offline_connections',
-                                         'Number of offline SMSC connections',
-                                         labels=['smsc_id'])
-        uptime = GaugeMetricFamily('bearerbox_smsc_uptime_seconds',
-                                   'SMSC uptime in seconds (*)',
-                                   labels=['smsc_id'])
-
-        # when there's only one smsc connection on the gateway
-        # xmltodict returns a dict instead of a list of dicts
-        if not isinstance(smsc_metrics['smsc'], list):
-            smsc_metrics['smsc'] = [smsc_metrics['smsc']]
-
-        # Aggregate SMSC metrics by smsc-id
+    def _aggregate_smsc_stats(self, smsc_metrics:List[Dict]) -> Dict[str, Any]:
         aggreg = {}
 
-        for smsc in smsc_metrics['smsc']:
+        for smsc in smsc_metrics:
             smscid = smsc['id']
 
             if smscid not in aggreg:
@@ -324,6 +290,45 @@ class KannelCollector(Collector):
                                                      + int(smsc['dlr']['received']))
                 aggreg[smscid]['dlr']['sent'] = (aggreg[smscid]['dlr'].get('sent', 0)
                                                  + int(smsc['dlr']['sent']))
+
+        return aggreg
+
+    def collect_smsc_stats(self, smsc_metrics: Dict[str, Any]) -> List[Metric]:
+        failed = CounterMetricFamily('bearerbox_smsc_failed_messages_total',
+                                     'Total number of SMSC failed messages',
+                                     labels=['smsc_id'])
+        queued = GaugeMetricFamily('bearerbox_smsc_queued_messages',
+                                   'Number of SMSC queued messages',
+                                   labels=['smsc_id'])
+        sms_received = CounterMetricFamily('bearerbox_smsc_received_sms_total',
+                                           'Total number of received SMS by SMSC',
+                                           labels=['smsc_id'])
+        sms_sent = CounterMetricFamily('bearerbox_smsc_sent_sms_total',
+                                       'Total number of SMS sent to SMSC',
+                                       labels=['smsc_id'])
+        dlr_received = CounterMetricFamily('bearerbox_smsc_received_dlr_total',
+                                           'Total number of DLRs received by SMSC',
+                                           labels=['smsc_id'])
+        dlr_sent = CounterMetricFamily('bearerbox_smsc_sent_dlr_total',
+                                       'Total number of DLRs sent to SMSC',
+                                       labels=['smsc_id'])
+        conn_online = GaugeMetricFamily('bearerbox_smsc_online_connections',
+                                        'Number of online SMSC connections',
+                                        labels=['smsc_id'])
+        conn_offline = GaugeMetricFamily('bearerbox_smsc_offline_connections',
+                                         'Number of offline SMSC connections',
+                                         labels=['smsc_id'])
+        uptime = GaugeMetricFamily('bearerbox_smsc_uptime_seconds',
+                                   'SMSC uptime in seconds (*)',
+                                   labels=['smsc_id'])
+
+        # when there's only one smsc connection on the gateway
+        # xmltodict returns a dict instead of a list of dicts
+        if not isinstance(smsc_metrics['smsc'], list):
+            smsc_metrics['smsc'] = [smsc_metrics['smsc']]
+
+        # Aggregate SMSC metrics by smsc-id
+        aggreg = self._aggregate_smsc_stats(smsc_metrics['smsc'])
 
         for smsc in aggreg:  # pylint: disable=consider-using-dict-items
             failed.add_metric([smsc], aggreg[smsc]['failed'])
