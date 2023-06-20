@@ -8,7 +8,7 @@
 
 Works with Kannel 1.4.4 or greater.
 
-:warning: Consider disabling smsc metrics collection by using the `--filter-smscs` flag or by dropping metrics on Prometheus server. On big setups there will be high cardinality issues.
+:warning: To avoid high cardinality issues, consider using the `--filter-smscs` flag or dropping metrics on the Prometheus server for big setups.
 
 ## Usage
 ```
