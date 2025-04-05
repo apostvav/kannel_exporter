@@ -63,7 +63,7 @@ def _xmlpostproc(path, key, value):  # pylint: disable=unused-argument
 
 
 CollectorOpts = namedtuple('CollectorOpts', ['timeout',
-                                             'filter_smsc',
+                                             'disable_smsc',
                                              'collect_wdp',
                                              'collect_box_uptime',
                                              'collect_smsc_uptime',
@@ -410,7 +410,7 @@ class KannelCollector(Collector):
         yield metric
 
         # SMSC metrics
-        if not self.opts.filter_smsc:
+        if not self.opts.disable_smsc:
             smsc_metrics = self.collect_smsc_stats(response['gateway']['smscs'])
             for metric in smsc_metrics:
                 yield metric
@@ -446,9 +446,9 @@ def cli() -> argparse.ArgumentParser:
     parser.add_argument('--timeout', dest='timeout', type=int,
                         help='Timeout for trying to get stats. (default 15)',
                         default=int(os.environ.get('KANNEL_EXPORTER_TIMEOUT', '15')))
-    parser.add_argument('--filter-smscs', dest='filter_smsc', action='store_true',
-                        help='Filter out SMSC metrics')
-    parser.add_argument('--collect-wdp', dest='collect_wdp', action='store_true',
+    parser.add_argument('--disable-smsc-metrics', dest='disable_smsc', action='store_true',
+                        help='Disable SMSC connections metrics')
+    parser.add_argument('--collect-wdp-metrics', dest='collect_wdp', action='store_true',
                         help='Collect WDP metrics.')
     parser.add_argument('--collect-box-uptime', dest='collect_box_uptime',
                         action='store_true', help='Collect boxes uptime metrics')
@@ -498,7 +498,7 @@ def main():
         status_password = args.password
 
     # collector options
-    opts = CollectorOpts(args.timeout, args.filter_smsc, args.collect_wdp,
+    opts = CollectorOpts(args.timeout, args.disable_smsc, args.collect_wdp,
                          args.collect_box_uptime, args.collect_smsc_uptime,
                          args.box_connections)
 
