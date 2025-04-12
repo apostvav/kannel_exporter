@@ -393,13 +393,11 @@ class KannelCollector(Collector):
 
         # WDP, SMS & DLR metrics
         msg_metrics = self.collect_msg_stats(response['gateway'])
-        for metric in msg_metrics:
-            yield metric
+        yield from msg_metrics
 
         # Box metrics
         box_metrics = self.collect_box_stats(response['gateway']['boxes'])
-        for metric in box_metrics:
-            yield metric
+        yield from box_metrics
 
         # Number of smsc connections
         metric = GaugeMetricFamily('bearerbox_smsc_connections',
@@ -412,8 +410,7 @@ class KannelCollector(Collector):
         # SMSC metrics
         if not self.opts.disable_smsc:
             smsc_metrics = self.collect_smsc_stats(response['gateway']['smscs'])
-            for metric in smsc_metrics:
-                yield metric
+            yield from smsc_metrics
 
         duration = time() - start
         metric = GaugeMetricFamily('bearerbox_scrape_duration_seconds',
