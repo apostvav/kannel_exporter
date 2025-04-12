@@ -8,12 +8,12 @@
 
 Works with Kannel 1.4.4 or greater.
 
-:warning: To avoid high cardinality issues, consider using the `--filter-smscs` flag or dropping metrics on the Prometheus server for big setups.
+:warning: To avoid high cardinality issues, consider using the `--disable-smsc-metrics` flag or dropping metrics on the Prometheus server for big setups.
 
 ## Usage
 ```
 kannel_exporter.py [-h] [--target TARGET] [--port PORT]
-                   [--timeout SECONDS] [--filter-smscs] [--collect-wdp]
+                   [--timeout SECONDS] [--disable-smsc-metrics] [--collect-wdp-metrics]
                    [--collect-box-uptime] [--collect-smsc-uptime]
                    [--box-connection-types BOX_CONNECTIONS [BOX_CONNECTIONS ...]]
                    [--log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}] [-v]
@@ -27,8 +27,8 @@ kannel_exporter.py [-h] [--target TARGET] [--port PORT]
                              (default http://127.0.0.1:13000)
   --port PORT                Exporter port. (default 9390)
   --timeout SECONDS          Timeout for trying to get stats. (default 15)
-  --filter-smscs             Filter out SMSC metrics
-  --collect-wdp              Collect WDP metrics
+  --disable-smsc-metrics     Disable SMSC connections metrics
+  --collect-wdp-metrics      Collect WDP metrics
   --collect-box-uptime       Collect boxes uptime metrics
   --collect-smsc-uptime      Collect SMSCs uptime metrics
   --box-connection-types     List of box connection types. (default wapbox, smsbox)
