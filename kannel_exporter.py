@@ -487,6 +487,7 @@ def main():
     logger.setLevel(args.log_level)
 
     # check if password has been set
+    status_password = None
     if args.password is None and args.password_file is None:
         parser.error('Option --password or --password-file must be set.')
     elif args.password_file:
