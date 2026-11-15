@@ -8,22 +8,26 @@ __version__ = '0.8.0'
 import argparse
 import logging
 import os
-import sys
 import re
-from urllib.request import urlopen
-from urllib.error import URLError
-from time import time
+import sys
 from collections import namedtuple
+from time import time
+from typing import Any
+from urllib.error import URLError
+from urllib.request import urlopen
 from wsgiref.simple_server import make_server
-from typing import Any, Optional, Dict, List
 from xml.parsers import expat
+
 import xmltodict
+from prometheus_client import (
+    GC_COLLECTOR,
+    PLATFORM_COLLECTOR,
+    PROCESS_COLLECTOR,
+    REGISTRY,
+    make_wsgi_app,
+)
+from prometheus_client.core import CounterMetricFamily, GaugeMetricFamily, Metric
 from prometheus_client.registry import Collector
-from prometheus_client.core import Metric
-from prometheus_client.core import GaugeMetricFamily, CounterMetricFamily
-from prometheus_client import REGISTRY, PLATFORM_COLLECTOR
-from prometheus_client import GC_COLLECTOR, PROCESS_COLLECTOR
-from prometheus_client import make_wsgi_app
 
 # logger
 logger = logging.getLogger('kannel_exporter')  # pylint: disable=invalid-name
@@ -46,12 +50,12 @@ def bearerbox_version(version: str) -> str:
         if version_position != -1:
             version = version[version_position + 8:].strip('`').rstrip('\'.')
         else:
-            logger.warning(('Bearerbox version could not be found. '
-                            'Version value set to empty string.'))
+            logger.warning('Bearerbox version could not be found. '
+                            'Version value set to empty string.')
             version = ""
     except IndexError:
-        logger.error(('Failed to parse gateway version. '
-                      'Version value set to empty string.'))
+        logger.error('Failed to parse gateway version. '
+                      'Version value set to empty string.')
         version = ""
     return version
 
@@ -78,7 +82,7 @@ class KannelCollector(Collector):
         self.password = password
         self.opts = opts
 
-    def parse_kannel_status(self) -> Optional[Dict[str, Any]]:
+    def parse_kannel_status(self) -> dict[str, Any] | None:
         url = self.target + '/status.xml?password=' + self.password
         status = None
         xml = None
@@ -102,7 +106,7 @@ class KannelCollector(Collector):
 
         return status
 
-    def collect_msg_stats(self, gw_metrics: Dict[str, Any]) -> List[Metric]:
+    def collect_msg_stats(self, gw_metrics: dict[str, Any]) -> list[Metric]:
         metrics = []
         directions = ['received', 'sent']
         states = ['total', 'queued']
@@ -181,7 +185,7 @@ class KannelCollector(Collector):
             box_details[tuplkey] = {}
             box_details[tuplkey]['uptime'] = uptime_to_secs(box['status'])
 
-    def collect_box_stats(self, box_metrics: Dict[str, Any]) -> List[Metric]:
+    def collect_box_stats(self, box_metrics: dict[str, Any]) -> list[Metric]:
         metrics = []
         box_connections = {b: 0 for b in self.opts.box_connections}
         box_details = {}
@@ -242,7 +246,7 @@ class KannelCollector(Collector):
 
         return metrics
 
-    def _aggregate_smsc_stats(self, smsc_metrics:List[Dict]) -> Dict[str, Any]:
+    def _aggregate_smsc_stats(self, smsc_metrics: list[dict[str, Any]]) -> dict[str, Any]:
         aggreg = {}
 
         for smsc in smsc_metrics:
@@ -293,7 +297,7 @@ class KannelCollector(Collector):
 
         return aggreg
 
-    def collect_smsc_stats(self, smsc_metrics: Dict[str, Any]) -> List[Metric]:
+    def collect_smsc_stats(self, smsc_metrics: dict[str, Any]) -> list[Metric]:
         failed = CounterMetricFamily('bearerbox_smsc_failed_messages_total',
                                      'Total number of SMSC failed messages',
                                      labels=['smsc_id'])
@@ -343,7 +347,7 @@ class KannelCollector(Collector):
             if self.opts.collect_smsc_uptime is True:
                 uptime.add_metric([smsc], aggreg[smsc]['uptime'])
 
-        metrics = [
+        metrics: list[Metric] = [
             failed,
             queued,
             sms_received,
